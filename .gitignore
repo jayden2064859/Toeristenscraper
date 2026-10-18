@@ -1,0 +1,10 @@
+# environment variables and secrets
+.env
+*.env
+
+# .NET build output
+bin/
+obj/
+
+# visual Studio
+.vs/

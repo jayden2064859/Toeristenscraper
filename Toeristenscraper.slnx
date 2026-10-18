@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".env" />
+    <File Path=".gitignore" />
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="Toeristenscraper.Data/Toeristenscraper.Data.csproj" />
+  <Project Path="Toeristenscraper.Scraper/Toeristenscraper.Scraper.csproj" />
+  <Project Path="Toeristenscraper.Web/Toeristenscraper.Web.csproj" />
+</Solution>
