@@ -15,7 +15,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
         public async Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken ct)
         {
             // methode uit FullSearch.cs wordt gebruikt om een request naar de API-operatie FullSearch te sturen,
-            // en daar de payload van op te halen
+            // en daar de payload van op te halen 
             using var firstDoc = await fullSearch.GetPageAsync(tile, 0, ct);
 
             // Parse methode uit FullSearchparser.cs wordt gebruikt om een FullSearchPage-object terug te geven,

@@ -12,7 +12,7 @@ using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
 
-// ScraperOptions registreren als service
+// ScraperOptions registreren als service (de 'Scraper' sectie uit appsetting.json wordt gekoppeld aan de modellen in ScraperOptions)
 builder.Services.Configure<ScraperOptions>(
     builder.Configuration.GetSection(ScraperOptions.SectionName));
 
