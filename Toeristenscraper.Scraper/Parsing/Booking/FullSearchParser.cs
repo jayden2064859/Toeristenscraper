@@ -17,15 +17,15 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
         {
             // de search node ophalen, dit is de root van de resultaten
             JsonElement search = Get(doc.RootElement, "data", "searchQueries", "search")
-                 ?? throw new ArgumentException("Missing required field: data.searchQueries.search");
+                 ?? throw new InvalidOperationException("FullSearch: missing required field inside JSON-response: data.searchQueries.search (contains the entire search results data)");
 
             // totaal aantal accommodaties ophalen
             int totalAccommodations = Get(search, "pagination", "nbResultsTotal")?.GetInt32()
-                ?? throw new ArgumentException("Missing required field: pagination.nbResultsTotal");
+                ?? throw new InvalidOperationException("FullSearch: missing required field inside JSON-response: pagination.nbResultsTotal (needed to determine tile-splitting for subsequent scrapes)");
 
             // inhoud van de resultaten ophalen (hier staan alle accommodaties in) 
             JsonElement results = Get(search, "results")
-                ?? throw new ArgumentException("Missing required field: results");
+                ?? throw new InvalidOperationException("FullSearch: missing required field inside JSON-response: results (containing accommodation listings)");
 
             // lijst aanmaken waar alle accommodaties in komen te staan
             List<DiscoveredAccommodation> accommodations = new List<DiscoveredAccommodation>();
@@ -68,9 +68,16 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                 // address
                 string? address = null;
                 JsonElement? addressElement = Get(result, "basicPropertyData", "location", "address");
-                if (!string.IsNullOrWhiteSpace(addressElement.Value.GetString()))
+                
+                // eerst checken of de address field uberhaupt aanwezig is voor de listing
+                if (addressElement != null)
                 {
                     address = addressElement.Value.GetString();
+                }
+                // als tweede checken of de bestaande field lege tekst bevat
+                if (string.IsNullOrWhiteSpace(address))
+                {
+                    address = null;
                 }
 
                 // accommodationType (numeriek)

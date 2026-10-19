@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
 using Toeristenscraper.Scraper.Parsing.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 
@@ -13,22 +14,38 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 
         public async Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken ct)
         {
-
+            // methode uit FullSearch.cs wordt gebruikt om een request naar de API-operatie FullSearch te sturen,
+            // en daar de payload van op te halen
             using var firstDoc = await fullSearch.GetPageAsync(tile, 0, ct);
-            FullSearchPage first = FullSearchParser.Parse(firstDoc);
 
-            if (first.NbResultsTotal > FullSearch.MaxResults)
-                return new TileSearchResult([], LimitReached: true);
+            // Parse methode uit FullSearchparser.cs wordt gebruikt om een FullSearchPage-object terug te geven,
+            // dat een lijst van DiscoveredAccommodation-objecten bevat (alle parsed data voor elke listing uit de FullSearch response)
+            var firstPage = FullSearchParser.Parse(firstDoc);
 
-
-            var all = new List<DiscoveredAccommodation>(first.Accommodations);
-            for (int offset = FullSearch.PageSize; offset < first.NbResultsTotal; offset += FullSearch.PageSize)
+            // LimitReached wordt op true gezet wanneer een response de limiet van accommodatie-listings heeft bereikt
+            // wanneer true, wordt het zoekgebied opgesplitst en apart doorzocht.
+            if (firstPage.NbResultsTotal > FullSearch.MaxResults)
             {
-                using var doc = await fullSearch.GetPageAsync(tile, offset, ct);
-                all.AddRange(FullSearchParser.Parse(doc).Accommodations);
+                return new TileSearchResult(new List<DiscoveredAccommodation>(), LimitReached: true);
             }
 
-            return new TileSearchResult(all, LimitReached: false);
+            var allAccommodations = new List<DiscoveredAccommodation>();         
+            allAccommodations.AddRange(firstPage.Accommodations);
+
+            // volgende pagina's ophalen: offset 100, 200, etc tot alle resultaten binnen zijn
+            int offset = FullSearch.PageSize;
+            while (offset < firstPage.NbResultsTotal)
+            {
+                using JsonDocument doc = await fullSearch.GetPageAsync(tile, offset, ct);
+                FullSearchPage page = FullSearchParser.Parse(doc);
+                allAccommodations.AddRange(page.Accommodations);
+
+                // elke subsequente request verhogen met offset +100 totdat het totaal aantal resultaten volledig opgehaald is
+                offset = offset + FullSearch.PageSize;
+            }
+
+            return new TileSearchResult(allAccommodations, LimitReached: false);
         }
+
     }
 }

@@ -10,8 +10,8 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
     // alleen request opbouwen en versturen. Het uitlezen van de response gebeurt in Parsing.
     public class FullSearch(HttpClient httpClient)
     {
-        public const int PageSize = 100;    // maximale grootte van een response
-        public const int MaxResults = 1000; // offset 0 t/m 900 
+        public const int PageSize = 100;    // maximaal aantal individuele listings dat Booking.com toestaat in één response-payload 
+        public const int MaxResults = 1000; // maximaal aantal individuele listings dat Booking.com toestaat voor de gehele resultatenset. (om de volledige 1000 op te halen moet offset 0 t/m 900 gebruikt worden, incrementeel met +100)
 
         private static readonly string BodyTemplate = File.ReadAllText(
             Path.Combine(AppContext.BaseDirectory, "SourceAbstraction", "Booking", "Queries", "FullSearch.json"));

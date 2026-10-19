@@ -1,9 +1,13 @@
-﻿using NetTopologySuite.Geometries;
+﻿using NetTopologySuite.Algorithm;
+using NetTopologySuite.Geometries;
 using NetTopologySuite.GeometriesGraph;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Booking;
+
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
 {
@@ -19,8 +23,45 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
     //    b) maximaal ingestelde diepte van opsplitsing is bereikt (zodat een tegel niet oneindig op kan splitsen waardoor de scraper vastloopt)
 
     
-    public class TileAlgorithm
+    public class TileAlgorithm()
     {
+        public async Task<List<DiscoveredAccommodation>> DiscoverAsync(
+            IAccommodationSource source, ScrapeArea area, int maxDepth, CancellationToken ct)
+        {
+            List<DiscoveredAccommodation> foundAccommodations = new List<DiscoveredAccommodation>();
+
+            // queue starten voor individuele tiles die gescraped moeten worden (aantal tiles is afhankelijk van de response van de vorige payload)
+            Queue<Tile> queue = new Queue<Tile>();
+
+            // eerste tile die doorzocht wordt is de volledige bounding-box, ongesplitst
+            queue.Enqueue(new Tile(area.NeLat, area.NeLng, area.SwLat, area.SwLng, "T", 0));
+
+            while (queue.Count > 0)
+            {
+                Tile tile = queue.Dequeue();
+                TileSearchResult result = await source.SearchTileAsync(tile, ct);
+
+                if (result.LimitReached == false)
+                {
+                    // lijst van accommodaties (parsed data voor het datamodel) teruggeven wanneer een response <1000 accommodatie-listings bevat
+                    foundAccommodations.AddRange(result.Accommodations);
+                }
+                else if (result.LimitReached == true && tile.Depth < maxDepth)
+                {
+                    // tegel opsplitsen en de vier kwadranten achteraan in de wachtrij zetten
+                    List<Tile> quadrants = SplitTile(tile);
+                    foreach (var quadrant in quadrants)
+                    {
+                        queue.Enqueue(quadrant);
+                    }
+                }
+            }
+
+            return foundAccommodations;
+        }
+
+
+        // methode voor het splitsen van een tegel in vier kwadranten
         public static List<Tile> SplitTile(Tile tile)
         {
             double midLat = (tile.NeLat + tile.SwLat) / 2;
@@ -41,7 +82,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                 midLng,
                 midLat,
                 tile.SwLng,
-                tile.Name + "NW",
+                tile.Name + "-NW",
                 tile.Depth + 1);
 
             // rechtsonder (zuidoost)
@@ -50,7 +91,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                 tile.NeLng,
                 tile.SwLat,
                 midLng,
-                tile.Name + "SE",
+                tile.Name + "-SE",
                 tile.Depth + 1);
 
             // linksonder (zuidwest)
@@ -59,7 +100,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                 midLng,
                 tile.SwLat,
                 tile.SwLng,
-                tile.Name + "SW",
+                tile.Name + "-SW",
                 tile.Depth + 1);
 
             return new List<Tile> { quadrant1, quadrant2, quadrant3, quadrant4 };
