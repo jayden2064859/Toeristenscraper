@@ -1,0 +1,83 @@
+{
+  "operationName": "FullSearch",
+  "query": "query FullSearch($input: SearchQueryInput!) { searchQueries { search(input: $input) { ... on SearchQueryOutput { pagination { nbResultsTotal } results { displayName { text } basicPropertyData { id pageName accommodationTypeId location { countryCode latitude longitude address } starRating { value } reviewScore: reviews { score: totalScore reviewCount: reviewsCount } } } } } } }",
+  "variables": {
+    "input": {
+      "acidCarouselContext": null,
+      "childrenAges": [],
+      "doAvailabilityCheck": false,
+      "encodedAutocompleteMeta": null,
+      "enableCampaigns": true,
+      "filters": {},
+      "selectedFilterSources": [
+        "SELF_FILTER_GROUP",
+        "UNKNOWN"
+      ],
+      "flexibleDatesConfig": {
+        "broadDatesCalendar": {
+          "checkinMonths": [],
+          "los": [],
+          "startWeekdays": []
+        },
+        "dateFlexUseCase": "DATE_RANGE",
+        "dateRangeCalendar": {
+          "checkin": [ "" ],
+          "checkout": [ "" ]
+        }
+      },
+      "forcedBlocks": null,
+      "location": {
+        "destType": "BOUNDING_BOX",
+        "boundingBox": {
+          "neLat": {{neLat}},
+          "neLon": {{neLon}},
+          "swLat": {{swLat}},
+          "swLon": {{swLon}},
+          "precision": 1
+        }
+      },
+      "metaContext": {
+        "metaCampaignId": 0,
+        "externalTotalPrice": null,
+        "feedPrice": null,
+        "hotelCenterAccountId": null,
+        "rateRuleId": null,
+        "dragongateTraceId": null,
+        "pricingProductsTag": null
+      },
+      "showAparthotelAsHotel": true,
+      "needsRoomsMatch": true,
+      "optionalFeatures": {
+        "businessPopularitySorter": true,
+        "forceArpExperiments": true,
+        "testProperties": true
+      },
+      "pagination": {
+        "rowsPerPage": 100,
+        "offset": {{offset}}
+      },
+      "referrerBlock": null,
+      "sbCalendarOpen": true,
+      "sorters": {
+        "selectedSorter": null,
+        "referenceGeoId": null,
+        "tripTypeIntentId": null
+      },
+      "travelPurpose": 2,
+      "seoThemeIds": [],
+      "useSearchParamsFromSession": false,
+      "merchInput": {
+        "testCampaignIds": []
+      },
+      "webSearchContext": {
+        "reason": "CLIENT_SIDE_UPDATE",
+        "source": "SEARCH_RESULTS",
+        "outcome": "SEARCH_RESULTS"
+      },
+      "clientSideRequestId": "3d7e37db336c07cc",
+      "searchSource": {
+        "userSource": "USER_INITIATED_CONVENTIONAL_SEARCH"
+      }
+    }
+  }
+}
