@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using Toeristenscraper.Data;
 using Toeristenscraper.Scraper;
 using Toeristenscraper.Scraper.Configuration;
+using Toeristenscraper.Scraper.Orchestration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
@@ -23,6 +24,9 @@ builder.Services.AddDbContext<ToeristenscraperDbContext>(o =>
 
 // TileAlgorithm registreren als service
 builder.Services.AddTransient<TileAlgorithm>();
+
+// Orchestrator registreren als service 
+builder.Services.AddTransient<ScrapeOrchestrator>();
 
 // FullSearch registreren als http-client zodat het kan worden geïnjecteerd in de worker
 var bookingBase = builder.Configuration["Scraper:Booking:BaseUrl"];
