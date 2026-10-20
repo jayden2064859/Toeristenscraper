@@ -8,6 +8,7 @@ using Toeristenscraper.Scraper.Orchestration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
+using Toeristenscraper.Scraper.Transport;
 
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -22,12 +23,6 @@ builder.Services.AddDbContext<ToeristenscraperDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("ToeristenDb"),
                 x => x.UseNetTopologySuite()));
 
-// TileAlgorithm registreren als service
-builder.Services.AddTransient<TileAlgorithm>();
-
-// Orchestrator registreren als service 
-builder.Services.AddTransient<ScrapeOrchestrator>();
-
 // FullSearch registreren als http-client zodat het kan worden geïnjecteerd in de worker
 var bookingBase = builder.Configuration["Scraper:Booking:BaseUrl"];
 builder.Services.AddHttpClient<FullSearch>(client =>
@@ -38,8 +33,12 @@ builder.Services.AddHttpClient<FullSearch>(client =>
     }
     client.DefaultRequestHeaders.Accept.Clear();
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-});
+}).AddHttpMessageHandler<BookingRequestDelayHandler>();
 
+//  transient services registreren (nieuwe instantie per request) 
+builder.Services.AddTransient<TileAlgorithm>();
+builder.Services.AddTransient<ScrapeOrchestrator>();
+builder.Services.AddTransient<BookingRequestDelayHandler>();
 builder.Services.AddTransient<IAccommodationSource, BookingSource>();
 
 var host = builder.Build();

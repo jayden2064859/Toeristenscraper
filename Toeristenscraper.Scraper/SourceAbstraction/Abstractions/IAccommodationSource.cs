@@ -10,8 +10,8 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
     // discovery en orchestration kennen alleen dit contract, nooit de platformspecifieke klassen
     public interface IAccommodationSource
     {
-        // (1 = Booking.com, 2 = Airbnb)
-        int PlatformId { get; }
+        string PlatformName { get; } 
+        int MaxDepth { get; }
 
         // doorzoekt één tegel. haalt eerst de eerste pagina op
         Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken cancellationToken);

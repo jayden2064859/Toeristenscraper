@@ -1,16 +1,19 @@
-﻿using System;
+﻿using Microsoft.Extensions.Options;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Parsing.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 {
     // implementeert IAccommodationSource: eerst pagina 1, bij >1000 resultaten meteen “limiet bereikt”, anders de overige pagina’s ophalen via offset
-    public class BookingSource(FullSearch fullSearch) : IAccommodationSource
+    public class BookingSource(FullSearch fullSearch, IOptions<ScraperOptions> options) : IAccommodationSource
     {
-        public int PlatformId { get; } = 1; // booking.com = 1
+        public string PlatformName { get; } = "Booking.com"; 
+        public int MaxDepth => options.Value.Booking.MaxDepth;
 
         public async Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken ct)
         {

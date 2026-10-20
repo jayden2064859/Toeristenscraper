@@ -27,7 +27,6 @@
 		<None Update="SourceAbstraction\Booking\Queries\*.json" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
   <ItemGroup>
-    <Folder Include="Orchestration\" />
     <Folder Include="SourceAbstraction\Airbnb\" />
     <Folder Include="SourceAbstraction\Booking\Queries\" />
   </ItemGroup>
