@@ -103,13 +103,17 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                 {
                     reviewCount = reviewCountElement.Value.GetInt32();
                 }
-                
+               
                 // averageReviewScore
                 decimal? averageReviewScore = null;
                 JsonElement? averageReviewScoreElement = Get(result, "basicPropertyData", "reviewScore", "score");
                 if (averageReviewScoreElement != null)
                 {
                     averageReviewScore = averageReviewScoreElement.Value.GetDecimal();
+                }
+                if (reviewCount == 0)
+                {
+                    averageReviewScore = null;
                 }
 
                 // countryCode 

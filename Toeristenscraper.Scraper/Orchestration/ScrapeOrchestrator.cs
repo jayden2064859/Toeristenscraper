@@ -19,7 +19,7 @@ namespace Toeristenscraper.Scraper.Orchestration
             Guid runId = Guid.NewGuid();
             Stopwatch stopwatch = Stopwatch.StartNew();
 
-            logger.LogInformation("Scrape-run {RunId} started at {StartTime}", runId, DateTime.Now);
+            logger.LogInformation("\nScrape-run {RunId} started at {StartTime}", runId, DateTime.Now);
 
             foreach (IAccommodationSource source in sources)
             {
@@ -43,7 +43,8 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                     // loggen hoeveel unieke accommodaties er opgehaald zijn
                     var uniqueListings = deduplicatedList.Count();
-                    logger.LogInformation("Platform {Platform}: {UniqueListings} unique listings retreived", source.PlatformName, uniqueListings);
+                    logger.LogInformation("\nPlatform {Platform}: {UniqueListings} unique listings retreived", source.PlatformName, uniqueListings);
+
                 }
                 catch (Exception ex)
                 {
@@ -52,8 +53,7 @@ namespace Toeristenscraper.Scraper.Orchestration
             }
             // einde run: eindtijd en totale duur van de scraperun loggen.
             stopwatch.Stop();
-            logger.LogInformation("Scrape-run {RunId} completed at {EndTime}. Total scrape-run duration: {totalDuration}.", runId, DateTime.Now, stopwatch.Elapsed);
-
+            logger.LogInformation("\nScrape-run {RunId} completed at {EndTime}. Total scrape-run duration: {totalDuration}.", runId, DateTime.Now, stopwatch.Elapsed);
                        
         }
     }    

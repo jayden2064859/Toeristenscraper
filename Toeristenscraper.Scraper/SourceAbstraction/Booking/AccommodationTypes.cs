@@ -7,16 +7,18 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
     // booking.com toont intern alleen numerieke waarden per accommodatietype. Deze .cs file bevat de gevonden textuele mapping van elk type.
     public enum AccommodationTypes
     {
+        Appartement = 201,
         Hostel = 203,
         Hotel = 204,
+        Motel = 205, 
         Resort = 206,
-        BnB = 208, // bed & breakfast
+        BnB = 208, 
         Vakantiepark = 212,
         Villa = 213, 
         Camping = 214,
         Boot = 215,
         Pension = 216,
-        Appartement = 219,
+        Aparthotel = 219,
         Vakantiehuis = 220,
         Lodge = 221,
         Homestay = 222,

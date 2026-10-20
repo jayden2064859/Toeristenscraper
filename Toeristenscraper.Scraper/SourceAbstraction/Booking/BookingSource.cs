@@ -1,7 +1,4 @@
 ﻿using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Parsing.Booking;
@@ -10,7 +7,7 @@ using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 {
     // implementeert IAccommodationSource: eerst pagina 1, bij >1000 resultaten meteen “limiet bereikt”, anders de overige pagina’s ophalen via offset
-    public class BookingSource(FullSearch fullSearch, IOptions<ScraperOptions> options) : IAccommodationSource
+    public class BookingSource(FullSearch fullSearch, IOptions<ScraperOptions> options, ILogger<BookingSource> logger) : IAccommodationSource
     {
         public string PlatformName { get; } = "Booking.com"; 
         public int MaxDepth => options.Value.Booking.MaxDepth;
@@ -47,6 +44,16 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
                 offset = offset + FullSearch.PageSize;
             }
 
+            // tijdens een testrun gaf een tegel nbResults = 0 op met 100 listings retreived. om dit te voorkomen wordt de onderstaande check toegevoegd
+            if (firstPage.NbResultsTotal == 0 && firstPage.Accommodations.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"FullSearch: Inconsistent response for tile {tile.Name}: nbResultsTotal = 0 while results contain {firstPage.Accommodations.Count} listings");
+            }
+
+
+            logger.LogDebug("Tile {TileName}: nbResultsTotal = {Total}, retrieved = {Count}",
+            tile.Name, firstPage.NbResultsTotal, allAccommodations.Count);
             return new TileSearchResult(allAccommodations, LimitReached: false);
         }
 
