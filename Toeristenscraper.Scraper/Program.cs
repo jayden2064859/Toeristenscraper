@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using System;
+using Microsoft.Extensions.Http.Resilience;
 using System.Net.Http.Headers;
 using Toeristenscraper.Data;
 using Toeristenscraper.Scraper;
@@ -23,9 +23,10 @@ builder.Services.AddDbContext<ToeristenscraperDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("ToeristenDb"),
                 x => x.UseNetTopologySuite()));
 
-// FullSearch registreren als http-client zodat het kan worden geïnjecteerd in de worker
 var bookingBase = builder.Configuration["Scraper:Booking:BaseUrl"];
-builder.Services.AddHttpClient<FullSearch>(client =>
+
+// FullSearch registreren als http-client
+IHttpClientBuilder fullSearchClient = builder.Services.AddHttpClient<FullSearch>(client =>
 {
     if (!string.IsNullOrWhiteSpace(bookingBase))
     {
@@ -33,7 +34,12 @@ builder.Services.AddHttpClient<FullSearch>(client =>
     }
     client.DefaultRequestHeaders.Accept.Clear();
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-}).AddHttpMessageHandler<BookingRequestDelayHandler>();
+    client.Timeout = TimeSpan.FromMinutes(3); 
+});
+
+// eerst de wachttijd tussen requests, daarna worden de polly-strategies uitgevoerd
+fullSearchClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
+fullSearchClient.AddResilienceHandler("booking-fullsearch", ResiliencePipelineSetup.Configure);
 
 //  transient services registreren (nieuwe instantie per request) 
 builder.Services.AddTransient<TileAlgorithm>();

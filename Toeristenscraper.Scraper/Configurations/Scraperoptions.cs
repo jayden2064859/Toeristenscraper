@@ -11,6 +11,7 @@
         // instellingen per platform
         public PlatformOptions Booking { get; set; } = new PlatformOptions();
         public PlatformOptions Airbnb { get; set; } = new PlatformOptions();
+        public ResilienceOptions Resilience { get; set; } = new ResilienceOptions(); 
     }
 
     // een gebied met de bounding box 
@@ -33,5 +34,19 @@
 
         // minimale wachttijd tussen twee requests naar dit platform 
         public int RequestDelayMs { get; set; }
+    }
+
+
+    // model voor polly configuraties
+    public class ResilienceOptions
+    {
+        public int MaxRetries { get; set; }
+        public int RetryDelaySeconds { get; set; }
+        public int RateLimitMaxRetries { get; set; }
+        public int RateLimitDelaySeconds { get; set; } 
+        public int CircuitMinimumThroughput { get; set; }
+        public int CircuitSamplingSeconds { get; set; }
+        public double CircuitFailureRatio { get; set; }
+        public int TimeoutSeconds { get; set; }
     }
 }
