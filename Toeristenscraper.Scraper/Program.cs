@@ -47,5 +47,7 @@ builder.Services.AddTransient<ScrapeOrchestrator>();
 builder.Services.AddTransient<BookingRequestDelayHandler>();
 builder.Services.AddTransient<IAccommodationSource, BookingSource>();
 
+builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "HH:mm:ss ");
+
 var host = builder.Build();
 host.Run();

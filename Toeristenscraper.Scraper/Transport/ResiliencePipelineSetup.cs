@@ -17,6 +17,7 @@ namespace Toeristenscraper.Scraper.Transport
 
             // retry bij 429 (too many requests)
             var rateLimitRetry = new HttpRetryStrategyOptions();
+            rateLimitRetry.Name = "RateLimitRetry";
             rateLimitRetry.MaxRetryAttempts = settings.RateLimitMaxRetries;
             rateLimitRetry.Delay = TimeSpan.FromSeconds(settings.RateLimitDelaySeconds);
             rateLimitRetry.BackoffType = DelayBackoffType.Constant;
@@ -30,6 +31,7 @@ namespace Toeristenscraper.Scraper.Transport
 
             // retry bij tijdelijke fouten
             var transientErrorsRetry = new HttpRetryStrategyOptions();
+            transientErrorsRetry.Name = "TransientRetry";
             transientErrorsRetry.MaxRetryAttempts = settings.MaxRetries;
             transientErrorsRetry.Delay = TimeSpan.FromSeconds(settings.RetryDelaySeconds);
             transientErrorsRetry.ShouldRetryAfterHeader = false;
@@ -45,6 +47,7 @@ namespace Toeristenscraper.Scraper.Transport
            
             // circuit-breaker (alleen 429) 
             var circuitBreaker = new CircuitBreakerStrategyOptions<HttpResponseMessage>();
+            circuitBreaker.Name = "RateLimitCircuitBreaker";
             circuitBreaker.FailureRatio = settings.CircuitFailureRatio;
             circuitBreaker.MinimumThroughput = settings.CircuitMinimumThroughput;
             circuitBreaker.SamplingDuration = TimeSpan.FromSeconds(settings.CircuitSamplingSeconds);

@@ -10,7 +10,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
     // discovery en orchestration kennen alleen dit contract, nooit de platformspecifieke klassen
     public interface IAccommodationSource
     {
-        string PlatformName { get; } 
+        public string PlatformName { get; }
         int MaxDepth { get; }
 
         // doorzoekt één tegel. haalt eerst de eerste pagina op
