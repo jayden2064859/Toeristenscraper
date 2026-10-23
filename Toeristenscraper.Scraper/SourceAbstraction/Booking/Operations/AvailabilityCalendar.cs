@@ -10,8 +10,6 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations
     public class AvailabilityCalendar(HttpClient httpClient)
     {
         public const int maxAmountOfDays = 61; // 61 beschikbaarheidsdatums in totaal per request
-        public const int latestAllowedStartDate = 500; // de startdatum van een request mag 500 dagen vooruit zijn.
-
         private static readonly string BodyTemplate = File.ReadAllText(
         Path.Combine(AppContext.BaseDirectory, "SourceAbstraction", "Booking", "Queries", "AvailabilityCalendar.json"));
 

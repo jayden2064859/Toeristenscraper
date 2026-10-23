@@ -81,8 +81,8 @@ namespace Toeristenscraper.Data
                 .HasOne(ra => ra.AccommodationRoom)
                 .WithMany(r => r.AccommodationRoomAmenities)
                 .HasForeignKey(ra => ra.AccommodationRoomId);
-            
-            // AccommodationListing 0..* - 0..1 AccommodationEstablishment
+
+            // AccommodationListing 1..* - 0..1 AccommodationEstablishment (applicatie zorgt ervoor dat een Establishment-rij voortkomt uit minimaal 1 listing)
             modelBuilder.Entity<AccommodationListing>()
                 .HasOne(l => l.AccommodationEstablishment)
                 .WithMany()

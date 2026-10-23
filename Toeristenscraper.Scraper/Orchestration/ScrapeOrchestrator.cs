@@ -8,12 +8,8 @@ using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
 namespace Toeristenscraper.Scraper.Orchestration
 {
     // bepaalt wat er tijdens een scrape-run gebeurt
-    public class ScrapeOrchestrator(IEnumerable<IAccommodationSource> sources, 
-                                    TileAlgorithm tileAlgorithm,
-                                    IOptions<ScraperOptions> options,
-                                    ILogger<ScrapeOrchestrator> logger)
+    public class ScrapeOrchestrator(IEnumerable<IAccommodationSource> sources, TileAlgorithm tileAlgorithm, IOptions<ScraperOptions> options, ILogger<ScrapeOrchestrator> logger)
     {
-
         public async Task RunAsync(CancellationToken ct)
         {
             // start van de run: elke run krijgt een run-id, en een starttijd (voor logging van scrapes)
@@ -54,20 +50,19 @@ namespace Toeristenscraper.Scraper.Orchestration
                     int uniqueListings = deduplicatedList.Count;
                     totalListings += uniqueListings;
                     logger.LogInformation("\nPlatform {Platform}: {UniqueListings} unique listings retrieved", source.PlatformName, uniqueListings);
-
+    
                     // detailoperaties per listing: een mislukte listing wordt overgeslagen, zodat de rest van de run doorgaat 
                     foreach (DiscoveredAccommodation listing in deduplicatedList)
                     {
                         try
                         {
                             IReadOnlyList<Availability> availabilityDays = await source.GetAvailabilityAsync(listing, ct);
-                            logger.LogDebug("Listing {SourceId}: {Days} availability days retrieved", listing.SourceId, availabilityDays.Count);
+                            logger.LogDebug("\nAvailabilityCalendar (Listing {SourceId}): {Days} days, from {First} to {Last}, {Available} available", listing.SourceId, availabilityDays.Count, availabilityDays.Min(day => day.AvailabilityDate), availabilityDays.Max(day => day.AvailabilityDate), availabilityDays.Count(day => day.IsAvailable == true));
 
                             // later hier opslaan in de database
                         }
                         catch (BrokenCircuitException)
-                        {
-                            
+                        {                         
                             throw;
                         }
                         catch (Exception ex)
@@ -94,7 +89,7 @@ namespace Toeristenscraper.Scraper.Orchestration
 
             // loggen of de scraperuns succesvol zijn uitgevoerd
             string runStatus;
-            if (stoppedPlatforms.Count == sources.Count() || failedListings == totalListings)
+            if (stoppedPlatforms.Count == sources.Count() || totalListings > 0 && failedListings == totalListings)
             {
                 runStatus = "Failed"; // geen enkel platform heeft de run afgemaakt
             }

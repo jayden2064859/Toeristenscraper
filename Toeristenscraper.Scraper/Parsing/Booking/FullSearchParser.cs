@@ -124,6 +124,21 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                     countryCode = countryCodeElement.Value.GetString();
                 }
 
+                // IsExactLocation
+                var isExactLocation = false; // standaard op false, alleen true voor Booking wanneer er een expliciet address field beschikbaar is 
+                if (address != null)
+                {
+                    isExactLocation = true;
+                }
+
+                // URL
+                string? url = null;
+                if (!string.IsNullOrEmpty(countryCode) && !string.IsNullOrEmpty(pageName.ToString()))
+                {
+                    url = $"https://www.booking.com/hotel/{countryCode}/{pageName}.html";
+                }
+
+
                 // DiscoveredAccommodation-object aanmaken voor elk gevonden listing
                 accommodations.Add(new DiscoveredAccommodation
                 {
@@ -136,6 +151,8 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                     StarClassification = starClassification,
                     ReviewCount = reviewCount,
                     AverageReviewScore = averageReviewScore,
+                    IsExactLocation = isExactLocation,
+                    URL = url,
 
                     // fields die niet in het datamodel opgeslagen worden, maar wel functioneel nodig zijn voor andere API-operaties
                     DetailParameters = new Dictionary<string, string>

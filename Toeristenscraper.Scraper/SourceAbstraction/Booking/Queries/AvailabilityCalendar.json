@@ -10,7 +10,7 @@
       "searchConfig": {
         "searchConfigDate": {
           "startDate": "{{startDate}}",
-          "amountOfDays": 61 
+          "amountOfDays": 61
         },
         "nbAdults": 1,
         "nbRooms": 1,
@@ -22,3 +22,4 @@
   "extensions": {},
   "query": "query AvailabilityCalendar($input: AvailabilityCalendarQueryInput!) { availabilityCalendar(input: $input) { ... on AvailabilityCalendarQueryResult { hotelId days { available checkin minLengthOfStay __typename } __typename } ... on AvailabilityCalendarQueryError { message __typename } __typename } }"
 }
+
