@@ -13,6 +13,9 @@ Per gebied voert het **TileAlgorithm** de bounding-box-strategie uit. Het hele g
 
 Het doorzoeken van een tegel gebeurt via **IAccommodationSource**, met per platform een eigen implementatie. Voor Booking.com is dat **BookingSource**, die via **FullSearch** de requests verstuurt en de responses laat omzetten door **FullSearchParser**. Hierdoor bevatten de orchestrator en het tegelalgoritme geen platformspecifieke code.
 
+## Availability - Booking.com
+Voor elk opgehaalde listing in een FullSearch response worden 366 beschikbaarheidsdagen opgehaald.
+
 ## Mappen in Toeristenscraper.Scraper
 - **Configurations**: ScraperOptions, gekoppeld aan de sectie "Scraper" in appsettings.json.
 - **Orchestration**: de ScrapeOrchestrator.
