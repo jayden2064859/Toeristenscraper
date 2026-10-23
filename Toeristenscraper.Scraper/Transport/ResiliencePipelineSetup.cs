@@ -51,6 +51,7 @@ namespace Toeristenscraper.Scraper.Transport
             circuitBreaker.FailureRatio = settings.CircuitFailureRatio;
             circuitBreaker.MinimumThroughput = settings.CircuitMinimumThroughput;
             circuitBreaker.SamplingDuration = TimeSpan.FromSeconds(settings.CircuitSamplingSeconds);
+            circuitBreaker.BreakDuration = TimeSpan.FromSeconds(settings.CircuitBreakDurationSeconds);
 
             circuitBreaker.ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
                 .HandleResult(response => response.StatusCode == HttpStatusCode.TooManyRequests); // alleen 429

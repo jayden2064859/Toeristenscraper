@@ -46,6 +46,7 @@
         public int RateLimitDelaySeconds { get; set; } 
         public int CircuitMinimumThroughput { get; set; }
         public int CircuitSamplingSeconds { get; set; }
+        public int CircuitBreakDurationSeconds { get; set; }
         public double CircuitFailureRatio { get; set; }
         public int TimeoutSeconds { get; set; }
     }

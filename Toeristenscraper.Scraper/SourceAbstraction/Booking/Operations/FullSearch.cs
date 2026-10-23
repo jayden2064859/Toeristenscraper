@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
+namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations
 {
     // verstuurt de FullSearch-request voor één pagina van een tegel.
     // alleen request opbouwen en versturen. Het uitlezen van de response gebeurt in Parsing.

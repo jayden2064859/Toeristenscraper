@@ -9,6 +9,7 @@ using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
 using Toeristenscraper.Scraper.Transport;
+using Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations;
 
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -37,9 +38,23 @@ IHttpClientBuilder fullSearchClient = builder.Services.AddHttpClient<FullSearch>
     client.Timeout = TimeSpan.FromMinutes(3); 
 });
 
+// AvailabilityCalendar registreren als http-client
+IHttpClientBuilder availabilityCalendarClient = builder.Services.AddHttpClient<AvailabilityCalendar>(client =>
+{
+    if (!string.IsNullOrWhiteSpace(bookingBase))
+    {
+        client.BaseAddress = new Uri(bookingBase);
+    }
+    client.DefaultRequestHeaders.Accept.Clear();
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+
 // eerst de wachttijd tussen requests, daarna worden de polly-strategies uitgevoerd
 fullSearchClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
 fullSearchClient.AddResilienceHandler("booking-fullsearch", ResiliencePipelineSetup.Configure);
+availabilityCalendarClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
+availabilityCalendarClient.AddResilienceHandler("booking-availability", ResiliencePipelineSetup.Configure);
 
 //  transient services registreren (nieuwe instantie per request) 
 builder.Services.AddTransient<TileAlgorithm>();

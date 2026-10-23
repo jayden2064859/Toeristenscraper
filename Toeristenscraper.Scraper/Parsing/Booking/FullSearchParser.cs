@@ -16,15 +16,15 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
         public static FullSearchPage Parse(JsonDocument doc)
         {
             // de search node ophalen, dit is de root van de resultaten
-            JsonElement search = Get(doc.RootElement, "data", "searchQueries", "search")
+            JsonElement search = GetJsonElementHelper.Get(doc.RootElement, "data", "searchQueries", "search")
                  ?? throw new InvalidOperationException("FullSearch: missing required field inside JSON-response: data.searchQueries.search (contains the entire search results data)");
 
             // totaal aantal accommodaties ophalen
-            int totalAccommodations = Get(search, "pagination", "nbResultsTotal")?.GetInt32()
+            int totalAccommodations = GetJsonElementHelper.Get(search, "pagination", "nbResultsTotal")?.GetInt32()
                 ?? throw new InvalidOperationException("FullSearch: missing required field inside JSON-response: pagination.nbResultsTotal (needed to determine tile-splitting for subsequent scrapes)");
 
             // inhoud van de resultaten ophalen (hier staan alle accommodaties in) 
-            JsonElement results = Get(search, "results")
+            JsonElement results = GetJsonElementHelper.Get(search, "results")
                 ?? throw new InvalidOperationException("FullSearch: missing required field inside JSON-response: results (containing accommodation listings)");
 
             // lijst aanmaken waar alle accommodaties in komen te staan
@@ -34,8 +34,8 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
             foreach (JsonElement result in results.EnumerateArray())
             {
                 // verplichte velden die nodig zijn voor subsequente API-operaties. Als een van deze twee ontbreekt, wordt de specifieke listing overgeslagen
-                JsonElement? id = Get(result, "basicPropertyData", "id"); // source-id
-                JsonElement? pageName = Get(result, "basicPropertyData", "pageName"); // pageName
+                JsonElement? id = GetJsonElementHelper.Get(result, "basicPropertyData", "id"); // source-id
+                JsonElement? pageName = GetJsonElementHelper.Get(result, "basicPropertyData", "pageName"); // pageName
                 if (id == null || pageName == null)
                 {
                     continue;
@@ -43,7 +43,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // title
                 string? title = null;
-                JsonElement? titleElement = Get(result, "displayName", "text");
+                JsonElement? titleElement = GetJsonElementHelper.Get(result, "displayName", "text");
                 if (titleElement != null)
                 {
                     title = titleElement.Value.GetString();
@@ -51,7 +51,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // latitude
                 double? latitude = null;
-                JsonElement? latitudeElement = Get(result, "basicPropertyData", "location", "latitude");
+                JsonElement? latitudeElement = GetJsonElementHelper.Get(result, "basicPropertyData", "location", "latitude");
                 if (latitudeElement != null)
                 {
                     latitude = latitudeElement.Value.GetDouble();
@@ -59,7 +59,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // longitude
                 double? longitude = null;
-                JsonElement? longitudeElement = Get(result, "basicPropertyData", "location", "longitude");
+                JsonElement? longitudeElement = GetJsonElementHelper.Get(result, "basicPropertyData", "location", "longitude");
                 if (longitudeElement != null)
                 {
                     longitude = longitudeElement.Value.GetDouble();
@@ -67,7 +67,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // address
                 string? address = null;
-                JsonElement? addressElement = Get(result, "basicPropertyData", "location", "address");
+                JsonElement? addressElement = GetJsonElementHelper.Get(result, "basicPropertyData", "location", "address");
                 
                 // eerst checken of de address field uberhaupt aanwezig is voor de listing
                 if (addressElement != null)
@@ -82,7 +82,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // accommodationType (numeriek)
                 int? accommodationTypeId = null;
-                JsonElement? accommodationTypeElement = Get(result, "basicPropertyData", "accommodationTypeId");
+                JsonElement? accommodationTypeElement = GetJsonElementHelper.Get(result, "basicPropertyData", "accommodationTypeId");
                 if (accommodationTypeElement != null)
                 {
                     accommodationTypeId = accommodationTypeElement.Value.GetInt32();
@@ -90,7 +90,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // starClassification
                 decimal? starClassification = null;
-                JsonElement? starClassificationElement = Get(result, "basicPropertyData", "starRating", "value");
+                JsonElement? starClassificationElement = GetJsonElementHelper.Get(result, "basicPropertyData", "starRating", "value");
                 if (starClassificationElement != null)
                 {
                     starClassification = starClassificationElement.Value.GetDecimal();
@@ -98,7 +98,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // reviewCount
                 int? reviewCount = null;
-                JsonElement? reviewCountElement = Get(result, "basicPropertyData", "reviewScore", "reviewCount");
+                JsonElement? reviewCountElement = GetJsonElementHelper.Get(result, "basicPropertyData", "reviewScore", "reviewCount");
                 if (reviewCountElement != null)
                 {
                     reviewCount = reviewCountElement.Value.GetInt32();
@@ -106,7 +106,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                
                 // averageReviewScore
                 decimal? averageReviewScore = null;
-                JsonElement? averageReviewScoreElement = Get(result, "basicPropertyData", "reviewScore", "score");
+                JsonElement? averageReviewScoreElement = GetJsonElementHelper.Get(result, "basicPropertyData", "reviewScore", "score");
                 if (averageReviewScoreElement != null)
                 {
                     averageReviewScore = averageReviewScoreElement.Value.GetDecimal();
@@ -118,7 +118,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
                 // countryCode 
                 string? countryCode = null;
-                JsonElement? countryCodeElement = Get(result, "basicPropertyData", "location", "countryCode");
+                JsonElement? countryCodeElement = GetJsonElementHelper.Get(result, "basicPropertyData", "location", "countryCode");
                 if (countryCodeElement != null)
                 {
                     countryCode = countryCodeElement.Value.GetString();
@@ -165,36 +165,5 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                 return $"Onbekend ({id})";
             }
         }
-
-        // helper method om een veld uit een JsonElement te halen, met pad als array van strings.
-        private static JsonElement? Get(JsonElement element, params string[] path)
-        {
-            JsonElement current = element;
-
-
-            foreach (string name in path)
-            {
-                if (current.ValueKind != JsonValueKind.Object) return null;
-
-                // stoppen als het veld niet bestaat
-                if (!current.TryGetProperty(name, out JsonElement next))
-                {
-                    return null;
-                }
-
-                // stoppen als het veld bestaat maar null is
-                if (next.ValueKind == JsonValueKind.Null)
-                {
-                    return null;
-                }
-
-                // een niveau dieper
-                current = next;
-            }
-
-            return current;
-        }
     }
-
-
 }

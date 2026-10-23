@@ -1,0 +1,24 @@
+{
+  "operationName": "AvailabilityCalendar",
+  "variables": {
+    "input": {
+      "travelPurpose": 2,
+      "pagenameDetails": {
+        "countryCode": "{{countryCode}}",
+        "pagename": "{{pageName}}"
+      },
+      "searchConfig": {
+        "searchConfigDate": {
+          "startDate": "{{startDate}}",
+          "amountOfDays": 61 
+        },
+        "nbAdults": 1,
+        "nbRooms": 1,
+        "nbChildren": 0,
+        "childrenAges": []
+      }
+    }
+  },
+  "extensions": {},
+  "query": "query AvailabilityCalendar($input: AvailabilityCalendarQueryInput!) { availabilityCalendar(input: $input) { ... on AvailabilityCalendarQueryResult { hotelId days { available checkin minLengthOfStay __typename } __typename } ... on AvailabilityCalendarQueryError { message __typename } __typename } }"
+}

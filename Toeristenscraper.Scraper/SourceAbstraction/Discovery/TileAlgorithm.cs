@@ -1,12 +1,9 @@
-﻿using NetTopologySuite.Algorithm;
-using NetTopologySuite.Geometries;
-using NetTopologySuite.GeometriesGraph;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿
+using Polly.CircuitBreaker;
+using System.Net;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
-using Toeristenscraper.Scraper.SourceAbstraction.Booking;
+
 
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
@@ -25,8 +22,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
     
     public class TileAlgorithm(ILogger<TileAlgorithm> logger) // logger toevoegen om tilesplitting te testen in console output (tijdelijk)
     {
-        public async Task<List<DiscoveredAccommodation>> DiscoverAsync(
-            IAccommodationSource source, ScrapeArea area, int maxDepth, CancellationToken ct)
+        public async Task<(IReadOnlyList<DiscoveredAccommodation>, List<Tile>)> DiscoverAsync(IAccommodationSource source, ScrapeArea area, int maxDepth, CancellationToken ct)
         {
             List<DiscoveredAccommodation> foundAccommodations = new List<DiscoveredAccommodation>();
 
@@ -35,11 +31,33 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
 
             // eerste tile die doorzocht wordt is de volledige bounding-box, ongesplitst
             queue.Enqueue(new Tile(area.NeLat, area.NeLng, area.SwLat, area.SwLng, "T", 0));
+            var failedTiles = new List<Tile>();
 
             while (queue.Count > 0)
             {
                 Tile tile = queue.Dequeue();
-                TileSearchResult result = await source.SearchTileAsync(tile, ct);
+                TileSearchResult result;
+                try
+                {
+                    result = await source.SearchTileAsync(tile, ct);
+                }
+                catch (BrokenCircuitException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is HttpRequestException httpException && httpException.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        throw;
+                    }
+
+                    logger.LogWarning(ex, "Tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped", area.Name, tile.Name, tile.Depth, source.PlatformName);
+                    failedTiles.Add(tile);
+                    continue;   // door met de volgende tegel in de queue
+                }
+
+
 
                 // loggen op welk tegelniveau momenteel gescraped wordt
                 logger.LogDebug("Tile {TileName} (depth {Depth}): limit reached = {LimitReached}",
@@ -53,7 +71,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                 else if (result.LimitReached == true && tile.Depth < maxDepth)
                 {
                     // tegel opsplitsen en de vier kwadranten achteraan in de wachtrij zetten
-                    List<Tile> quadrants = SplitTile(tile);
+                    IReadOnlyList<Tile> quadrants = SplitTile(tile);
                     foreach (var quadrant in quadrants)
                     {
                         queue.Enqueue(quadrant);
@@ -61,12 +79,12 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                 }
             }
 
-            return foundAccommodations;
+            return (foundAccommodations, failedTiles);
         }
 
 
         // methode voor het splitsen van een tegel in vier kwadranten
-        public static List<Tile> SplitTile(Tile tile)
+        public static IReadOnlyList<Tile> SplitTile(Tile tile)
         {
             double midLat = (tile.NeLat + tile.SwLat) / 2;
             double midLng = (tile.NeLng + tile.SwLng) / 2;

@@ -13,9 +13,11 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
         public string PlatformName { get; }
         int MaxDepth { get; }
 
-        // doorzoekt één tegel. haalt eerst de eerste pagina op
+        // discovery operaties
         Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken cancellationToken);
 
-        // later toevoegen: detailoperaties per gevonden accommodatie.
+        // detail operaties
+        Task<IReadOnlyList<Availability>> GetAvailabilityAsync(DiscoveredAccommodation listing, CancellationToken ct);
+
     }
 }

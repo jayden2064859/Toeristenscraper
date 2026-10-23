@@ -20,8 +20,10 @@ namespace Toeristenscraper.Scraper.Orchestration
             Guid runId = Guid.NewGuid();
             Stopwatch stopwatch = Stopwatch.StartNew();
 
-            // lijst aanmaken waar de platformnamen in komen te staan wanneer een scrape-run ervoor stopt, zodat dit concreet gelogd kan worden
-            List<string> failedPlatforms = new List<string>();
+            List<string> stoppedPlatforms = new List<string>();
+            List<string> failedTiles = new List<string>();
+            int failedListings = 0;
+            int totalListings = 0;
 
             logger.LogInformation("\nScrape-run {RunId} started at {StartTime}\n", runId, DateTime.Now);
 
@@ -37,9 +39,12 @@ namespace Toeristenscraper.Scraper.Orchestration
                     {
                         // method uit TileAlgorithm.cs aanroepen die de discovery (inclusief tegelsplitsing) van accommodaties uitvoert.
                         // resultaten per gebied worden toegevoegd aan de platformresults lijst
-                        platformResults.AddRange(await tileAlgorithm.DiscoverAsync(source, area, source.MaxDepth, ct));
-
-                        // hier worden de detailoperaties uitgevoerd
+                        var (accommodations, areaFailedTiles) = await tileAlgorithm.DiscoverAsync(source, area, source.MaxDepth, ct);
+                        platformResults.AddRange(accommodations);
+                        foreach (Tile failedTile in areaFailedTiles)
+                        {
+                            failedTiles.Add($"{source.PlatformName}/{area.Name}/{failedTile.Name}");
+                        }
                     }
 
                     // lijst van alle opgehaalde accommodatie-listings ontdubbelen en in een nieuwe gefilterde lijst zetten
@@ -47,17 +52,40 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                     // loggen hoeveel unieke accommodaties er opgehaald zijn
                     int uniqueListings = deduplicatedList.Count;
+                    totalListings += uniqueListings;
                     logger.LogInformation("\nPlatform {Platform}: {UniqueListings} unique listings retrieved", source.PlatformName, uniqueListings);
+
+                    // detailoperaties per listing: een mislukte listing wordt overgeslagen, zodat de rest van de run doorgaat 
+                    foreach (DiscoveredAccommodation listing in deduplicatedList)
+                    {
+                        try
+                        {
+                            IReadOnlyList<Availability> availabilityDays = await source.GetAvailabilityAsync(listing, ct);
+                            logger.LogDebug("Listing {SourceId}: {Days} availability days retrieved", listing.SourceId, availabilityDays.Count);
+
+                            // later hier opslaan in de database
+                        }
+                        catch (BrokenCircuitException)
+                        {
+                            
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Listing {SourceId} on {Platform} skipped", listing.SourceId, source.PlatformName);
+                            failedListings += 1;
+                        }
+                    }
 
                 }
                 catch (BrokenCircuitException ex)  // loggen wanneer circuit geopent is (run gestopt for specifiek platform)
                 {
-                    failedPlatforms.Add(source.PlatformName);
+                    stoppedPlatforms.Add($"{source.PlatformName} (circuit open)");
                     logger.LogError(ex, "Scrape-run {RunId}: circuit opened for {Platform}, platform stopped for this run", runId, source.PlatformName);
                 }
                 catch (Exception ex) 
                 {
-                    failedPlatforms.Add(source.PlatformName);
+                    stoppedPlatforms.Add($"{source.PlatformName} ({ex.GetType().Name})");
                     logger.LogError(ex, "Scrape-run {RunId}: error occurred on {Platform}", runId, source.PlatformName);
                 }
             }
@@ -66,22 +94,32 @@ namespace Toeristenscraper.Scraper.Orchestration
 
             // loggen of de scraperuns succesvol zijn uitgevoerd
             string runStatus;
-            if (failedPlatforms.Count == 0)
+            if (stoppedPlatforms.Count == sources.Count() || failedListings == totalListings)
             {
-                runStatus = "Succeeded";
-                failedPlatforms.Add("None");
+                runStatus = "Failed"; // geen enkel platform heeft de run afgemaakt
             }
-            else if (failedPlatforms.Count < sources.Count())
+            else if (stoppedPlatforms.Count > 0 || failedTiles.Count > 0 || failedListings > 0)
             {
-                runStatus = "PartiallyFailed";
+                runStatus = "PartiallyFailed";   
             }
             else
             {
-                runStatus = "Failed";
+                runStatus = "Succeeded";
             }
 
-            logger.LogInformation("\nScrape-run {RunId} completed at {EndTime} with status '{runStatus}'. Failed platforms: {FailedPlatforms}. Duration: {totalDuration}.", runId, DateTime.Now, runStatus, failedPlatforms, stopwatch.Elapsed);
-                       
+            // "None" tonen in de logregel als er niets gestopt of mislukt is
+            if (stoppedPlatforms.Count == 0)
+            {
+                stoppedPlatforms.Add("None");
+            }
+            if (failedTiles.Count == 0)
+            {
+                failedTiles.Add("None");
+            }
+
+            logger.LogInformation("\nScrape-run {RunId} completed at {EndTime} with status {RunStatus}.\nStopped platforms: {stoppedPlatforms}.\nFailed tiles: {FailedTiles}.\nTotal (unique) listings: {TotalListings}\nFailed listings: {FailedListings}.\nDuration: {TotalDuration}.",
+                                runId, DateTime.Now, runStatus, stoppedPlatforms, failedTiles, totalListings, failedListings, stopwatch.Elapsed);
+
         }
     }    
 }
