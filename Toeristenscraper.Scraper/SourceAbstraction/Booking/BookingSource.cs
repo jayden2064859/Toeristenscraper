@@ -11,6 +11,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
     public class BookingSource(FullSearch fullSearch, AvailabilityCalendar availabilityCalendar, IOptions<ScraperOptions> options, ILogger<BookingSource> logger) : IAccommodationSource
     {
         public string PlatformName { get; } = "Booking.com";
+        public int PlatformId { get; } = 1;
         public int MaxDepth => options.Value.Booking.MaxDepth;
 
         public async Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken ct)

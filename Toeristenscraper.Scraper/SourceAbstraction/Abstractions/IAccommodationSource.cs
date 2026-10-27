@@ -11,6 +11,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
     public interface IAccommodationSource
     {
         public string PlatformName { get; }
+        public int PlatformId { get; }
         int MaxDepth { get; }
 
         // discovery operaties

@@ -1,14 +1,17 @@
 ﻿using Microsoft.Extensions.Options;
+using Npgsql;
 using Polly.CircuitBreaker;
 using System.Diagnostics;
+using System.Net;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
+using Toeristenscraper.Scraper.Storage;
 
 namespace Toeristenscraper.Scraper.Orchestration
 {
     // bepaalt wat er tijdens een scrape-run gebeurt
-    public class ScrapeOrchestrator(IEnumerable<IAccommodationSource> sources, TileAlgorithm tileAlgorithm, IOptions<ScraperOptions> options, ILogger<ScrapeOrchestrator> logger)
+    public class ScrapeOrchestrator(IEnumerable<IAccommodationSource> sources, TileAlgorithm tileAlgorithm, IOptions<ScraperOptions> options, ILogger<ScrapeOrchestrator> logger, IServiceScopeFactory scopeFactory)
     {
         public async Task RunAsync(CancellationToken ct)
         {
@@ -16,10 +19,14 @@ namespace Toeristenscraper.Scraper.Orchestration
             Guid runId = Guid.NewGuid();
             Stopwatch stopwatch = Stopwatch.StartNew();
 
+            // logging-gerelateerde variables
             List<string> stoppedPlatforms = new List<string>();
             List<string> failedTiles = new List<string>();
+            int retrievedListings = 0;
             int failedListings = 0;
             int totalListings = 0;
+            int skippedForeignListings = 0;
+            DateOnly scrapingDate = DateOnly.FromDateTime(DateTime.Today);
 
             logger.LogInformation("\nScrape-run {RunId} started at {StartTime}\n", runId, DateTime.Now);
 
@@ -27,6 +34,14 @@ namespace Toeristenscraper.Scraper.Orchestration
             {
                 try
                 {
+                    // WriteToDb gebruikt de DbContext, die scoped is. De orchestrator wordt vanuit de singleton Worker aangeroepen,
+                    // daarom krijgt elk platform een eigen scope en daarmee een eigen DbContext, die na het platform weer wordt opgeruimd
+                    await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+                    WriteToDb dbWriter = scope.ServiceProvider.GetRequiredService<WriteToDb>();
+
+                    // listings worden per groep opgeslagen, zodat niet elke listing een eigen databaseaanroep krijgt
+                    List<ScrapedAccommodation> batch = new List<ScrapedAccommodation>();
+
                     // alle accommodaties van dit platform worden hierin opgeslagen, over alle gescrapete gebieden
                     List<DiscoveredAccommodation> platformResults = new List<DiscoveredAccommodation>();
 
@@ -48,18 +63,32 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                     // loggen hoeveel unieke accommodaties er opgehaald zijn
                     int uniqueListings = deduplicatedList.Count;
+                    retrievedListings += uniqueListings;
                     totalListings += uniqueListings;
                     logger.LogInformation("\nPlatform {Platform}: {UniqueListings} unique listings retrieved", source.PlatformName, uniqueListings);
-    
+
+                    int foreignListings = 0;
                     // detailoperaties per listing: een mislukte listing wordt overgeslagen, zodat de rest van de run doorgaat 
                     foreach (DiscoveredAccommodation listing in deduplicatedList)
                     {
+                        // alleen listings in Nederland verwerken (de klanten zijn Nederlandse gemeenten). Zonder landcode field (Airbnb) wordt de listing wel verwerkt
+                        if (listing.CountryCode != null && !string.Equals(listing.CountryCode, "nl", StringComparison.OrdinalIgnoreCase))
+                        {
+                            foreignListings += 1;
+                            continue;
+                        }
+
                         try
                         {
                             IReadOnlyList<Availability> availabilityDays = await source.GetAvailabilityAsync(listing, ct);
                             logger.LogDebug("\nAvailabilityCalendar (Listing {SourceId}): {Days} days, from {First} to {Last}, {Available} available", listing.SourceId, availabilityDays.Count, availabilityDays.Min(day => day.AvailabilityDate), availabilityDays.Max(day => day.AvailabilityDate), availabilityDays.Count(day => day.IsAvailable == true));
 
-                            // later hier opslaan in de database
+                            batch.Add(new ScrapedAccommodation { Accommodation = listing, Availability = availabilityDays });
+
+                            if (batch.Count == WriteToDb.BatchSize) 
+                            {
+                                failedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, ct);
+                            }
                         }
                         catch (BrokenCircuitException)
                         {                         
@@ -67,10 +96,24 @@ namespace Toeristenscraper.Scraper.Orchestration
                         }
                         catch (Exception ex)
                         {
+                            if (ex is HttpRequestException httpException && httpException.StatusCode == HttpStatusCode.NotFound)
+                            {
+                                throw; // platform stopt met scrapen bij een 404 (not found)
+                            }
+                            if (IsDatabaseUnavailable(ex))
+                            {
+                                throw;
+                            }
                             logger.LogWarning(ex, "Listing {SourceId} on {Platform} skipped", listing.SourceId, source.PlatformName);
                             failedListings += 1;
                         }
                     }
+                    totalListings -= foreignListings;
+                    skippedForeignListings += foreignListings;
+
+                    // laatste batch wegschrijven
+                    int result = await SaveBatchAsync(dbWriter, source, scrapingDate, batch, ct);
+                    failedListings += result; // aantal mislukte listings uit de SaveBatchAsync methode toevoegen aan de variabele voor het totaal aantal mislukte listings
 
                 }
                 catch (BrokenCircuitException ex)  // loggen wanneer circuit geopent is (run gestopt for specifiek platform)
@@ -112,9 +155,46 @@ namespace Toeristenscraper.Scraper.Orchestration
                 failedTiles.Add("None");
             }
 
-            logger.LogInformation("\nScrape-run {RunId} completed at {EndTime} with status {RunStatus}.\nStopped platforms: {stoppedPlatforms}.\nFailed tiles: {FailedTiles}.\nTotal (unique) listings: {TotalListings}\nFailed listings: {FailedListings}.\nDuration: {TotalDuration}.",
-                                runId, DateTime.Now, runStatus, stoppedPlatforms, failedTiles, totalListings, failedListings, stopwatch.Elapsed);
+            logger.LogInformation("\nScrape-run {RunId} completed at {EndTime} with status {RunStatus}.\nStopped platforms: {StoppedPlatforms}.\nFailed tiles: {FailedTiles}.\nTotal unique listings retrieved: {RetrievedListings}\nForeign listings skipped: {SkippedForeignListings}.\nTotal listings (filtered): {TotalListings}.\nFailed listings: {FailedListings}.\nDuration: {TotalDuration}.",
+            runId, DateTime.Now, runStatus, stoppedPlatforms, failedTiles, retrievedListings, skippedForeignListings, totalListings, failedListings, stopwatch.Elapsed);
 
+        }
+
+        // helper method die de WriteBatchAsync methode aanroept om een batch op te slaan naar de database. de helper method geeft het aantal mislukte weggeschreven listings terug
+        private async Task<int> SaveBatchAsync(WriteToDb dbWriter, IAccommodationSource source, DateOnly scrapingDate, List<ScrapedAccommodation> batch, CancellationToken ct)
+        {
+            int failed = 0;
+            try
+            {
+                await dbWriter.WriteBatchAsync(source.PlatformId, scrapingDate, batch, ct);
+            }
+            catch (Exception ex)
+            {
+                if (IsDatabaseUnavailable(ex))
+                {
+                    logger.LogError(ex, "Database unavailable, batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.InnerException?.Message ?? ex.Message);
+                    throw;
+                }
+                logger.LogWarning(ex, "Batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.Message);
+                failed = batch.Count;
+            }
+            batch.Clear();
+            return failed;
+        }
+
+        // helper method die controleert of een fout (of een inner exception) wordt veroorzaakt door een onbereikbare database
+        private static bool IsDatabaseUnavailable(Exception ex)
+        {
+            Exception? current = ex;
+            while (current != null)
+            {
+                if (current is NpgsqlException npgsqlException && npgsqlException.IsTransient)
+                {
+                    return true;
+                }
+                current = current.InnerException;
+            }
+            return false;
         }
     }    
 }

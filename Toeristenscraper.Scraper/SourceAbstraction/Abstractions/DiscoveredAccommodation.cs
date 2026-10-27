@@ -22,6 +22,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
         public decimal? AverageReviewScore { get; init; }
         public string? URL { get; init; } 
         public bool? IsExactLocation { get; init; }
+        public string? CountryCode { get; init; }
 
 
         // platformspecifieke gegevens die alleen nodig zijn voor de detailoperaties van dat platform,

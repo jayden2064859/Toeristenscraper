@@ -153,6 +153,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                     AverageReviewScore = averageReviewScore,
                     IsExactLocation = isExactLocation,
                     URL = url,
+                    CountryCode = countryCode,
 
                     // fields die niet in het datamodel opgeslagen worden, maar wel functioneel nodig zijn voor andere API-operaties
                     DetailParameters = new Dictionary<string, string>

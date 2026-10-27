@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using Toeristenscraper.Data;
 using Toeristenscraper.Scraper;
@@ -7,10 +8,10 @@ using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Orchestration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
-using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
-using Toeristenscraper.Scraper.Transport;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations;
-
+using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
+using Toeristenscraper.Scraper.Storage;
+using Toeristenscraper.Scraper.Transport;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
@@ -61,6 +62,7 @@ builder.Services.AddTransient<TileAlgorithm>();
 builder.Services.AddTransient<ScrapeOrchestrator>();
 builder.Services.AddTransient<BookingRequestDelayHandler>();
 builder.Services.AddTransient<IAccommodationSource, BookingSource>();
+builder.Services.AddScoped<WriteToDb>();
 
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "HH:mm:ss ");
 

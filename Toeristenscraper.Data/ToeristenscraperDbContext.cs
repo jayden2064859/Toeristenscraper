@@ -20,7 +20,7 @@ namespace Toeristenscraper.Data
         public DbSet<Platform> Platform { get; set; }
         public DbSet<AccommodationAvailability> AccommodationAvailability { get; set; }
         public DbSet<AccommodationReview> AccommodationReview { get; set; }
-
+        public DbSet<LocalityBoundary> LocalityBoundary { get; set; }
 
         // relaties, keys, constraints en andere configuraties 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -89,7 +89,17 @@ namespace Toeristenscraper.Data
                 .HasForeignKey(l => l.AccommodationEstablishmentId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-
+            // referentietabel met woonplaatsgrenzen (aangemaakt door ogr2ogr)
+            modelBuilder.Entity<LocalityBoundary>(l =>
+            {
+                l.ToTable("ref_locality_boundary", t => t.ExcludeFromMigrations());
+                l.HasKey(x => x.Id);
+                l.Property(x => x.Id).HasColumnName("ogc_fid");
+                l.Property(x => x.City).HasColumnName("city");
+                l.Property(x => x.Municipality).HasColumnName("municipality");
+                l.Property(x => x.Province).HasColumnName("province");
+                l.Property(x => x.Geom).HasColumnName("geom");
+            });
 
 
             // index om de laatste versie van een listing op te zoeken, niet uniek

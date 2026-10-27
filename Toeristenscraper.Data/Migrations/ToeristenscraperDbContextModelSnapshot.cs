@@ -281,6 +281,40 @@ namespace Toeristenscraper.Data.Migrations
                     b.ToTable("AccommodationRoomAmenity");
                 });
 
+            modelBuilder.Entity("Toeristenscraper.Data.Entities.LocalityBoundary", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("ogc_fid");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("City")
+                        .HasColumnType("text")
+                        .HasColumnName("city");
+
+                    b.Property<Geometry>("Geom")
+                        .IsRequired()
+                        .HasColumnType("geometry")
+                        .HasColumnName("geom");
+
+                    b.Property<string>("Municipality")
+                        .HasColumnType("text")
+                        .HasColumnName("municipality");
+
+                    b.Property<string>("Province")
+                        .HasColumnType("text")
+                        .HasColumnName("province");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ref_locality_boundary", null, t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
             modelBuilder.Entity("Toeristenscraper.Data.Entities.Platform", b =>
                 {
                     b.Property<int>("PlatformId")

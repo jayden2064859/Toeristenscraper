@@ -20,7 +20,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
     //    b) maximaal ingestelde diepte van opsplitsing is bereikt (zodat een tegel niet oneindig op kan splitsen waardoor de scraper vastloopt)
 
     
-    public class TileAlgorithm(ILogger<TileAlgorithm> logger) // logger toevoegen om tilesplitting te testen in console output (tijdelijk)
+    public class TileAlgorithm(ILogger<TileAlgorithm> logger) 
     {
         public async Task<(IReadOnlyList<DiscoveredAccommodation>, List<Tile>)> DiscoverAsync(IAccommodationSource source, ScrapeArea area, int maxDepth, CancellationToken ct)
         {
@@ -76,6 +76,12 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                     {
                         queue.Enqueue(quadrant);
                     }
+                }
+                else // wanneer een tegel nog steeds de resultatenlimiet bereikt en op maximale depth zit. 
+                {
+                    // opgehaalde batches opslaan met een warning log
+                    foundAccommodations.AddRange(result.Accommodations);
+                    logger.LogWarning("Tile {Area}/{TileName} at max depth ({MaxDepth}) still exceeding total results limit", area.Name, tile.Name, tile.Depth);
                 }
             }
 
