@@ -79,8 +79,6 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                 }
                 else // wanneer een tegel nog steeds de resultatenlimiet bereikt en op maximale depth zit. 
                 {
-                    // opgehaalde batches opslaan met een warning log
-                    foundAccommodations.AddRange(result.Accommodations);
                     logger.LogWarning("Tile {Area}/{TileName} at max depth ({MaxDepth}) still exceeding total results limit", area.Name, tile.Name, tile.Depth);
                 }
             }

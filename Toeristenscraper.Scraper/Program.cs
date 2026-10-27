@@ -21,10 +21,13 @@ builder.Services.Configure<ScraperOptions>(
     builder.Configuration.GetSection(ScraperOptions.SectionName));
 
 // DbContext registreren als service
+// EnableRetryOnFailure: bij een tijdelijke databasefout probeert EF de operatie eerst 5 keer opnieuw, daarna wordt de fout doorgegeven aan de orchestrator (run wordt gestopt)
 builder.Services.AddDbContext<ToeristenscraperDbContext>(o =>
-    o.UseNpgsql(builder.Configuration.GetConnectionString("ToeristenDb"),
-                x => x.UseNetTopologySuite()));
-
+    o.UseNpgsql(builder.Configuration.GetConnectionString("ToeristenDb"), x =>
+    {
+        x.UseNetTopologySuite();
+        x.EnableRetryOnFailure(5);
+    }));
 var bookingBase = builder.Configuration["Scraper:Booking:BaseUrl"];
 
 // FullSearch registreren als http-client

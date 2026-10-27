@@ -175,7 +175,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                     logger.LogError(ex, "Database unavailable, batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.InnerException?.Message ?? ex.Message);
                     throw;
                 }
-                logger.LogWarning(ex, "Batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.Message);
+                logger.LogError(ex, "Batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.InnerException?.Message ?? ex.Message);
                 failed = batch.Count;
             }
             batch.Clear();
