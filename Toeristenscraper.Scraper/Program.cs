@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
-using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using Toeristenscraper.Data;
 using Toeristenscraper.Scraper;
 using Toeristenscraper.Scraper.Configuration;
+using Toeristenscraper.Scraper.Configurations;
 using Toeristenscraper.Scraper.Orchestration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
@@ -20,8 +20,12 @@ builder.Services.AddHostedService<Worker>();
 builder.Services.Configure<ScraperOptions>(
     builder.Configuration.GetSection(ScraperOptions.SectionName));
 
+// ScheduleOptions registreren (sectie 'Schedule': tijdstip, tijdzone en RunOnStartup)
+builder.Services.Configure<ScheduleOptions>(
+        builder.Configuration.GetSection(ScheduleOptions.SectionName));
+
 // DbContext registreren als service
-// EnableRetryOnFailure: bij een tijdelijke databasefout probeert EF de operatie eerst 5 keer opnieuw, daarna wordt de fout doorgegeven aan de orchestrator (run wordt gestopt)
+// EnableRetryOnFailure: bij een tijdelijke databasefout probeert EF de operatie eerst 5 keer opnieuw, daarna wordt de fout doorgegeven aan de orchestrator (platform run wordt gestopt)
 builder.Services.AddDbContext<ToeristenscraperDbContext>(o =>
     o.UseNpgsql(builder.Configuration.GetConnectionString("ToeristenDb"), x =>
     {
