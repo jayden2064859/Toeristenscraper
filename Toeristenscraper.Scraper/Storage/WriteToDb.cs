@@ -196,7 +196,16 @@ namespace Toeristenscraper.Scraper.Storage
             }
             return a.X == b.X && a.Y == b.Y;
         }
+
+        // methode voor airbnb om te checken of een listing binnen Nederland ligt 
+        // hiervoor wordt de referentietabel LocalityBoundary gebruikt om de gebiedsindeling te bepalen voor elke listing 
         
+        public async Task<bool> IsDutchListingAsync(double? latitude, double? longitude, CancellationToken ct)
+        {
+            // de referentietabel bevat alleen data over Nederland. Elke listing die coordinaten buiten NL bevat, wordt als null teruggegeven hier
+            LocalityBoundary? region = await LookupRegionAsync(latitude, longitude, ct);
+            return region != null;
+        }
     }
 }
 

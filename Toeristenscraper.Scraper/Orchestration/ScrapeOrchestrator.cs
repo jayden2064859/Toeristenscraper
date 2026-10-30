@@ -71,11 +71,21 @@ namespace Toeristenscraper.Scraper.Orchestration
                     // detailoperaties per listing: een mislukte listing wordt overgeslagen, zodat de rest van de run doorgaat 
                     foreach (DiscoveredAccommodation listing in deduplicatedList)
                     {
-                        // alleen listings in Nederland verwerken (de klanten zijn Nederlandse gemeenten). Zonder landcode field (Airbnb) wordt de listing wel verwerkt
+                        // alleen listings in Nederland verwerken: Booking.com bevat per listing een landcode waarop gecontroleerd kan worden
                         if (listing.CountryCode != null && !string.Equals(listing.CountryCode, "nl", StringComparison.OrdinalIgnoreCase))
                         {
                             foreignListings += 1;
                             continue;
+                        }
+                        // airbnb wordt handmatig gecontroleerd waarbij de coordinaten opgezocht worden in de localityboundary referentietabel 
+                        else
+                        {
+                            bool isDutchListing = await dbWriter.IsDutchListingAsync(listing.Latitude, listing.Longitude, ct);
+                            if (!isDutchListing)
+                            {
+                                foreignListings += 1;
+                                continue;
+                            }
                         }
 
                         try
