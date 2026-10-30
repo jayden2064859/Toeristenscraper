@@ -7,6 +7,8 @@ using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Configurations;
 using Toeristenscraper.Scraper.Orchestration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Airbnb;
+using Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations;
 using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
@@ -16,11 +18,11 @@ using Toeristenscraper.Scraper.Transport;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
 
-// ScraperOptions registreren als service (de 'Scraper' sectie uit appsetting.json wordt gekoppeld aan de modellen in ScraperOptions)
+// option classes registreren als service (waarden staan geconfigureerd in appsettings.json)
 builder.Services.Configure<ScraperOptions>(
     builder.Configuration.GetSection(ScraperOptions.SectionName));
 
-// ScheduleOptions registreren (sectie 'Schedule': tijdstip, tijdzone en RunOnStartup)
+
 builder.Services.Configure<ScheduleOptions>(
         builder.Configuration.GetSection(ScheduleOptions.SectionName));
 
@@ -33,8 +35,33 @@ builder.Services.AddDbContext<ToeristenscraperDbContext>(o =>
         x.EnableRetryOnFailure(5);
     }));
 var bookingBase = builder.Configuration["Scraper:Booking:BaseUrl"];
+var airbnbBase = builder.Configuration["Scraper:Airbnb:BaseUrl"];
 
-// FullSearch registreren als http-client
+// http-clients registreren
+IHttpClientBuilder staysSearchClient = builder.Services.AddHttpClient<StaysSearch>(client =>
+{
+    if (!string.IsNullOrWhiteSpace(airbnbBase))
+    {
+        client.BaseAddress = new Uri(airbnbBase);
+    }
+    client.DefaultRequestHeaders.Add("X-Airbnb-API-Key", builder.Configuration["Scraper:Airbnb:ApiKey"]);
+    client.DefaultRequestHeaders.Accept.Clear();
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+
+IHttpClientBuilder pdpAvailabilityCalendarClient = builder.Services.AddHttpClient<PdpAvailabilityCalendar>(client =>
+{
+    if (!string.IsNullOrWhiteSpace(airbnbBase))
+    {
+        client.BaseAddress = new Uri(airbnbBase);
+    }
+    client.DefaultRequestHeaders.Add("X-Airbnb-API-Key", builder.Configuration["Scraper:Airbnb:ApiKey"]);
+    client.DefaultRequestHeaders.Accept.Clear();
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+
 IHttpClientBuilder fullSearchClient = builder.Services.AddHttpClient<FullSearch>(client =>
 {
     if (!string.IsNullOrWhiteSpace(bookingBase))
@@ -46,7 +73,6 @@ IHttpClientBuilder fullSearchClient = builder.Services.AddHttpClient<FullSearch>
     client.Timeout = TimeSpan.FromMinutes(3); 
 });
 
-// AvailabilityCalendar registreren als http-client
 IHttpClientBuilder availabilityCalendarClient = builder.Services.AddHttpClient<AvailabilityCalendar>(client =>
 {
     if (!string.IsNullOrWhiteSpace(bookingBase))
@@ -58,9 +84,16 @@ IHttpClientBuilder availabilityCalendarClient = builder.Services.AddHttpClient<A
     client.Timeout = TimeSpan.FromMinutes(3);
 });
 
-// eerst de wachttijd tussen requests, daarna worden de polly-strategies uitgevoerd
+// per http-client de request delay + resilience strategy handlers toevoegen
+staysSearchClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
+staysSearchClient.AddResilienceHandler("airbnb-staysearch", ResiliencePipelineSetup.Configure);
+
+pdpAvailabilityCalendarClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
+pdpAvailabilityCalendarClient.AddResilienceHandler("airbnb-availability", ResiliencePipelineSetup.Configure);
+
 fullSearchClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
 fullSearchClient.AddResilienceHandler("booking-fullsearch", ResiliencePipelineSetup.Configure);
+
 availabilityCalendarClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
 availabilityCalendarClient.AddResilienceHandler("booking-availability", ResiliencePipelineSetup.Configure);
 
@@ -68,7 +101,9 @@ availabilityCalendarClient.AddResilienceHandler("booking-availability", Resilien
 builder.Services.AddTransient<TileAlgorithm>();
 builder.Services.AddTransient<ScrapeOrchestrator>();
 builder.Services.AddTransient<BookingRequestDelayHandler>();
-builder.Services.AddTransient<IAccommodationSource, BookingSource>();
+builder.Services.AddTransient<AirbnbRequestDelayHandler>();
+//builder.Services.AddTransient<IAccommodationSource, BookingSource>();
+builder.Services.AddTransient<IAccommodationSource, AirbnbSource>();
 builder.Services.AddScoped<WriteToDb>();
 
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "HH:mm:ss ");

@@ -1,0 +1,5 @@
+﻿{
+    "operationName": "PdpAvailabilityCalendar",
+    "query": "query PdpAvailabilityCalendar { merlin { pdpAvailabilityCalendar(request: { count: {{count}}, listingId: \"{{sourceId}}\", month: {{month}}, year: {{year}}, returnPropertyLevelCalendarIfApplicable: false }) { calendarMonths { month year days { calendarDate available minNights maxNights } } } } }",
+    "variables": {}
+}

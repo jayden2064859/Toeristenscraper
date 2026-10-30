@@ -81,7 +81,10 @@ namespace Toeristenscraper.Scraper.Orchestration
                         try
                         {
                             IReadOnlyList<Availability> availabilityDays = await source.GetAvailabilityAsync(listing, ct);
-                            logger.LogDebug("\nAvailabilityCalendar (Listing {SourceId}): {Days} days, from {First} to {Last}, {Available} available", listing.SourceId, availabilityDays.Count, availabilityDays.Min(day => day.AvailabilityDate), availabilityDays.Max(day => day.AvailabilityDate), availabilityDays.Count(day => day.IsAvailable == true));
+                            if (availabilityDays.Count > 0)
+                            {
+                                logger.LogDebug("\nAvailabilityCalendar (Listing {SourceId}): {Days} days, from {First} to {Last}, {Available} available", listing.SourceId, availabilityDays.Count, availabilityDays.Min(day => day.AvailabilityDate), availabilityDays.Max(day => day.AvailabilityDate), availabilityDays.Count(day => day.IsAvailable == true));
+                            }
 
                             batch.Add(new ScrapedAccommodation { Accommodation = listing, Availability = availabilityDays });
 

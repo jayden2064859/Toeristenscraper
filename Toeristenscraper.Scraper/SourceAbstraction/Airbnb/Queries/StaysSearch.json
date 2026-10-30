@@ -1,0 +1,105 @@
+{
+  "operationName": "StaysSearch",
+  "query": "query StaysSearch($staysSearchRequest: StaysSearchRequest!) { presentation { staysSearch(staysSearchRequest: $staysSearchRequest) { results { searchResults { ... on StaySearchResult { title nameLocalized { localizedStringWithTranslationPreference } badges { loggingContext { badgeType } } listingParamOverrides { photoId categoryTag } demandStayListing { id location { coordinate { latitude longitude } } } } } paginationInfo { pageCursors nextPageCursor } loggingMetadata { legacyLoggingContext { federatedSearchId } } } } } }",
+  "variables": {
+    "staysSearchRequest": {
+      "cursor": {{cursor}},
+      "metadataOnly": false,
+      "requestedPageType": "STAYS_SEARCH",
+      "treatmentFlags": [
+        "feed_map_decouple_m11_treatment",
+        "recommended_amenities_2024_treatment_b",
+        "filter_redesign_2024_treatment",
+        "filter_reordering_2024_roomtype_treatment",
+        "p2_category_bar_removal_treatment",
+        "selected_filters_2024_treatment",
+        "recommended_filters_2024_treatment_b",
+        "m13_search_input_phase2_treatment",
+        "m13_search_input_services_enabled",
+        "m13_2025_experiences_p2_treatment",
+        "homes_p25_refresh_2025_treatment"
+      ],
+      "maxMapItems": 9999,
+      "rawParams": [
+        {
+          "filterName": "cdnCacheSafe",
+          "filterValues": [
+            "false"
+          ]
+        },
+        {
+          "filterName": "channel",
+          "filterValues": [
+            "EXPLORE"
+          ]
+        },
+        {
+          "filterName": "neLat",
+          "filterValues": [
+            "{{neLat}}"
+          ]
+        },
+        {
+          "filterName": "neLng",
+          "filterValues": [
+            "{{neLng}}"
+          ]
+        },
+        {
+          "filterName": "swLat",
+          "filterValues": [
+            "{{swLat}}"
+          ]
+        },
+        {
+          "filterName": "swLng",
+          "filterValues": [
+            "{{swLng}}"
+          ]
+        },
+        {
+          "filterName": "searchByMap",
+          "filterValues": [
+            "true"
+          ]
+        },
+        {
+          "filterName": "datePickerType",
+          "filterValues": [
+            "calendar"
+          ]
+        },
+        {
+          "filterName": "itemsPerGrid",
+          "filterValues": [
+            "18"
+          ]
+        },
+        {
+          "filterName": "refinementPaths",
+          "filterValues": [
+            "/homes"
+          ]
+        },
+        {
+          "filterName": "screenSize",
+          "filterValues": [
+            "large"
+          ]
+        },
+        {
+          "filterName": "tabId",
+          "filterValues": [
+            "home_tab"
+          ]
+        },
+        {
+          "filterName": "version",
+          "filterValues": [
+            "1.8.8"
+          ]
+        }
+      ]
+    }
+  }
+}
