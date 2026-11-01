@@ -19,6 +19,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
 
         // detail operaties
         Task<IReadOnlyList<Availability>> GetAvailabilityAsync(DiscoveredAccommodation listing, CancellationToken ct);
+        Task<AccommodationDetails> GetDetailsAsync(DiscoveredAccommodation listing, IReadOnlyList<Availability> availability, CancellationToken ct);
 
     }
 }

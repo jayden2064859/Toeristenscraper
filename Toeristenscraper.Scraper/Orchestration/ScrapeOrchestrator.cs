@@ -72,10 +72,13 @@ namespace Toeristenscraper.Scraper.Orchestration
                     foreach (DiscoveredAccommodation listing in deduplicatedList)
                     {
                         // alleen listings in Nederland verwerken: Booking.com bevat per listing een landcode waarop gecontroleerd kan worden
-                        if (listing.CountryCode != null && !string.Equals(listing.CountryCode, "nl", StringComparison.OrdinalIgnoreCase))
+                        if (listing.CountryCode != null)
                         {
-                            foreignListings += 1;
-                            continue;
+                            if (!string.Equals(listing.CountryCode, "nl", StringComparison.OrdinalIgnoreCase))
+                            {
+                                foreignListings += 1;
+                                continue;
+                            }
                         }
                         // airbnb wordt handmatig gecontroleerd waarbij de coordinaten opgezocht worden in de localityboundary referentietabel 
                         else
@@ -90,13 +93,25 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                         try
                         {
+                            // beschikbaarheid van de listing ophalen 
                             IReadOnlyList<Availability> availabilityDays = await source.GetAvailabilityAsync(listing, ct);
                             if (availabilityDays.Count > 0)
                             {
                                 logger.LogDebug("\nAvailabilityCalendar (Listing {SourceId}): {Days} days, from {First} to {Last}, {Available} available", listing.SourceId, availabilityDays.Count, availabilityDays.Min(day => day.AvailabilityDate), availabilityDays.Max(day => day.AvailabilityDate), availabilityDays.Count(day => day.IsAvailable == true));
                             }
 
-                            batch.Add(new ScrapedAccommodation { Accommodation = listing, Availability = availabilityDays });
+                            // detailoperaties van de listing uitvoeren om het datamodel te vullen
+                            AccommodationDetails details = await source.GetDetailsAsync(listing, availabilityDays, ct);
+                            logger.LogDebug("\nStaysPdpSections (Listing {SourceId}): type {Type}, reviews {Count}/{Score}, superhost {Superhost}, KVK {Kvk}, registratie {Registration}, {Rooms} kamers, {Amenities} voorzieningen",
+                                                listing.SourceId, details.AccommodationType, details.ReviewCount, details.AverageReviewScore, details.Superhost, details.KvkNumber, details.RegistrationNumber, details.Rooms.Count, details.Amenities.Count);
+
+                            // testlog
+                            foreach (RoomDetails room in details.Rooms)
+                            {
+                                logger.LogDebug("Kamer {RoomType}: {Price} totaal, belasting inbegrepen {TaxIncluded}, belasting {Tax}", room.RoomType, room.TotalPrice, room.TaxIncluded, room.TaxAmount);
+                            }
+
+                            batch.Add(new ScrapedAccommodation { Accommodation = listing, Availability = availabilityDays, Details = details });
 
                             if (batch.Count == WriteToDb.BatchSize) 
                             {

@@ -8,7 +8,8 @@ using Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb
 {
-    public class AirbnbSource(StaysSearch staysSearch, PdpAvailabilityCalendar pdpAvailabilityCalendar, IOptions<ScraperOptions> options, ILogger<AirbnbSource> logger) : IAccommodationSource
+    public class AirbnbSource(StaysSearch staysSearch, PdpAvailabilityCalendar pdpAvailabilityCalendar, StaysPdpSections staysPdpSections, 
+                                IOptions<ScraperOptions> options, ILogger<AirbnbSource> logger) : IAccommodationSource
     {
         public string PlatformName { get; } = "Airbnb";
         public int PlatformId { get; } = 2;
@@ -43,6 +44,28 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb
             using JsonDocument doc = await pdpAvailabilityCalendar.GetPageAsync(listing.SourceId, today.Month, today.Year, ct);
 
             return PdpAvailabilityCalendarParser.Parse(doc, today).Calendars;
+        }
+
+        public async Task<AccommodationDetails> GetDetailsAsync(DiscoveredAccommodation listing, IReadOnlyList<Availability> availability, CancellationToken ct)
+        {
+            // search parameter opties uit appsettings worden gebruikt
+            SearchParameterOptions search = options.Value.SearchParameters;
+            DateOnly checkIn = DateOnly.FromDateTime(DateTime.Today).AddDays(search.CheckInOffsetDays);
+            
+            // aantal nachten: standaard ophet geconfigureerde aantal in appsettings
+            int nights = search.Nights;
+            foreach (Availability day in availability)
+            {
+                // als de minimale verblijfsduur op de incheckdatum groter is dan het geconfigureerde aantal nachten, wordt de minimale verblijfsduur gebruikt (anders wordt er geen prijs terugegeven)
+                if (day.AvailabilityDate == checkIn && day.MinLengthOfStay != null && day.MinLengthOfStay.Value > nights)
+                {
+                    nights = day.MinLengthOfStay.Value;
+                }
+            }
+            DateOnly checkOut = checkIn.AddDays(nights);
+
+            using JsonDocument doc = await staysPdpSections.GetPageAsync(listing.SourceId, checkIn, checkOut, ct);
+            return StaysPdpSectionsParser.Parse(doc, checkIn, checkOut, search.Adults, search.Children, search.Pets);
         }
     }
 }

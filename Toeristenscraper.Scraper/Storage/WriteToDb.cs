@@ -16,8 +16,17 @@ namespace Toeristenscraper.Scraper.Storage
             {
                 return;
             }
+
             // lijst van sourceIds van alle opgehaalde listings maken
             List<string> sourceIds = batch.Select(item => item.Accommodation.SourceId).ToList();
+
+            // listings die vandaag al gescraped zijn (bijv. na een herstart): beschikbaarheid en kamers worden niet nog een keer opgeslagen,
+            // omdat de beschikbaarheid per listing, datum en scrapedatum uniek is en kamers anders dubbel worden vastgelegd
+            List<string> alreadyScrapedToday = await db.AccommodationAvailability
+                .Where(a => a.ScrapingDate == scrapingDate && a.AccommodationListing.PlatformId == platformId && sourceIds.Contains(a.AccommodationListing.SourceId))
+                .Select(a => a.AccommodationListing.SourceId)
+                .Distinct()
+                .ToListAsync(ct);
 
             // meest recent opgeslagen versie van een AccommodationListing-record uit de database ophalen
             Dictionary<string, AccommodationListing> latestListings = await db.AccommodationListing
@@ -41,16 +50,61 @@ namespace Toeristenscraper.Scraper.Storage
                     .ThenByDescending(r => r.AccommodationReviewId)
                     .First());
 
+            // bestaande vestigingen met de registratienummers uit deze batch ophalen
+            List<string> registrationNumbers = new List<string>();
+            foreach (ScrapedAccommodation item in batch)
+            {
+                if (item.Details.RegistrationNumber != null && !registrationNumbers.Contains(item.Details.RegistrationNumber))
+                {
+                    registrationNumbers.Add(item.Details.RegistrationNumber);
+                }
+            }
+
+            // bestaande vestigingen (registratienummers) in een dictionary zetten, zodat er opgezocht kan worden of een registratienummer uit de gescrapete batch al in de database staat
+            Dictionary<string, AccommodationEstablishment> establishments = await db.AccommodationEstablishment
+                .Where(e => registrationNumbers.Contains(e.RegistrationNumber))
+                .ToDictionaryAsync(e => e.RegistrationNumber, ct);
+
+            // meest recente set voorzieningen per listing (over alle versies van de listing heen), om wijzigingen te herkennen
+            List<AccommodationAmenity> existingAmenities = await db.AccommodationAmenity
+                .Include(a => a.AccommodationListing)
+                .Where(a => a.AccommodationListing.PlatformId == platformId && sourceIds.Contains(a.AccommodationListing.SourceId))
+                .ToListAsync(ct);
+
+            Dictionary<string, HashSet<string>> latestAmenitySets = new Dictionary<string, HashSet<string>>();
+            foreach (IGrouping<string, AccommodationAmenity> group in existingAmenities.GroupBy(a => a.AccommodationListing.SourceId))
+            {
+                DateOnly latestDate = group.Max(a => a.ScrapingDate);
+                latestAmenitySets[group.Key] = group.Where(a => a.ScrapingDate == latestDate).Select(a => a.AmenityValue).ToHashSet(); 
+            }
+
             List<AccommodationAvailability> availabilityRows = new List<AccommodationAvailability>();
             int newListings = 0;
             int newReviews = 0;
+            int newAmenitySets = 0;
+            int newRooms = 0;
 
 
             // meest recent opgeslagen versie van een listing vergelijken met de huidig gescrapete versie. Als er een waarde gewijzigd is, wordt er een nieuw record gemaakt
             foreach (ScrapedAccommodation item in batch)
             {
+                // vestiging opzoeken of aanmaken 
+                AccommodationEstablishment? establishment = null;
+                string? registrationNumber = item.Details.RegistrationNumber;
+                if (registrationNumber != null)
+                {
+                    // controleren of het registratienummer van de huidig doorlopen listing al in de dictionary van bestaande registratienummers staat
+                    establishment = establishments.GetValueOrDefault(registrationNumber);
+                    if (establishment == null)
+                    {
+                        establishment = new AccommodationEstablishment { RegistrationNumber = registrationNumber };
+                        db.AccommodationEstablishment.Add(establishment);
+                        establishments[registrationNumber] = establishment; // nieuw aangemaakte establishment toevoegen aan de dictionary zodat het niet opnieuw aangemaakt kan worden
+                    }
+                }
+                // woonplaats, gemeente en provincie bepalen met PostGIS (ST_Contains via NetTopologySuite). null wanneer er geen coördinaten zijn of het punt buiten Nederland ligt
                 LocalityBoundary? region = await LookupRegionAsync(item.Accommodation.Latitude, item.Accommodation.Longitude, ct);
-                AccommodationListing candidate = MapListing(item.Accommodation, platformId, region, scrapingDate);
+                AccommodationListing candidate = MapListing(item, platformId, region, establishment, scrapingDate);
                
                 // laatst opgeslagen versie opzoeken, null als de listing nog niet in de database staat
                 AccommodationListing? latest = latestListings.GetValueOrDefault(candidate.SourceId);
@@ -69,8 +123,8 @@ namespace Toeristenscraper.Scraper.Storage
                 }
 
                 // review alleen opslaan als het aantal reviews of de gemiddelde score gewijzigd is
-                int? reviewCount = item.Accommodation.ReviewCount;
-                decimal? reviewScore = item.Accommodation.AverageReviewScore;
+                int? reviewCount = item.Details.ReviewCount ?? item.Accommodation.ReviewCount;
+                decimal? reviewScore = item.Details.AverageReviewScore ?? item.Accommodation.AverageReviewScore;
 
                 if (reviewCount != null || reviewScore != null)
                 {
@@ -89,6 +143,58 @@ namespace Toeristenscraper.Scraper.Storage
                         });
                         newReviews += 1;
                     }
+                }
+
+                if (alreadyScrapedToday.Contains(candidate.SourceId))
+                {
+                    logger.LogDebug("Listing {SourceId} already scraped on {ScrapingDate}, availability and rooms skipped", candidate.SourceId, scrapingDate);
+                    continue;
+                }
+
+                // kamerinfo met prijsobservatie
+                AccommodationDetails details = item.Details;
+                if (details.CheckInDate != null && details.CheckOutDate != null) 
+                {
+                    foreach (RoomDetails room in details.Rooms)
+                    {
+                        AccommodationRoom roomRow = new AccommodationRoom
+                        {
+                            AccommodationListing = listing,
+                            SourceRoomId = room.SourceRoomId,
+                            RoomType = room.RoomType,
+                            RoomSize = room.RoomSize,
+                            MaxCapacity = room.MaxCapacity,
+                            BedCount = room.BedCount,
+                            BedType = room.BedType,
+                            TotalPrice = room.TotalPrice,
+                            TaxIncluded = room.TaxIncluded,
+                            TaxAmount = room.TaxAmount,
+                            CheckInDate = details.CheckInDate.Value,
+                            CheckOutDate = details.CheckOutDate.Value,
+                            AdultCount = details.AdultCount ?? 0,
+                            ChildCount = details.ChildCount ?? 0,
+                            PetCount = details.PetCount ?? 0,
+                            ScrapingDate = scrapingDate
+                        };
+                        foreach (string amenity in room.Amenities)
+                        {
+                            roomRow.AccommodationRoomAmenities.Add(new AccommodationRoomAmenity { AmenityValue = amenity, ScrapingDate = scrapingDate });
+                        }
+                        db.AccommodationRoom.Add(roomRow);
+                        newRooms += 1;
+                    }
+                }
+
+                // accommodatie-brede voorzieningen: alleen een nieuwe set vastleggen als de set gewijzigd is
+                HashSet<string> currentAmenities = details.Amenities.ToHashSet();
+                HashSet<string>? previousAmenities = latestAmenitySets.GetValueOrDefault(candidate.SourceId);
+                if (currentAmenities.Count > 0 && (previousAmenities == null || !previousAmenities.SetEquals(currentAmenities)))
+                {
+                    foreach (string amenity in currentAmenities)
+                    {
+                        db.AccommodationAmenity.Add(new AccommodationAmenity { AccommodationListing = listing, AmenityValue = amenity, ScrapingDate = scrapingDate });
+                    }
+                    newAmenitySets += 1;
                 }
 
                 // beschikbaarheid: dagen zonder datum, beschikbaarheid of minimaal aantal nachten kunnen niet opgeslagen worden (verplichte kolommen)
@@ -119,12 +225,15 @@ namespace Toeristenscraper.Scraper.Storage
             {
                 db.ChangeTracker.Clear();
             }
-            logger.LogDebug("Batch saved: {Accommodations} accommodations, {NewListings} new listing versions, {NewReviews} new reviews, {Rows} availability rows",
-               batch.Count, newListings, newReviews, availabilityRows.Count);     
+            logger.LogDebug("Batch saved: {Accommodations} accommodations, {NewListings} new listing versions, {NewReviews} new reviews, {newRooms} new rooms, {newAmenitySets} new amenity sets, {Rows} availability rows",
+               batch.Count, newListings, newReviews, newRooms, newAmenitySets, availabilityRows.Count);     
         }
 
-        private static AccommodationListing MapListing(DiscoveredAccommodation accommodation, int platformId, LocalityBoundary? region, DateOnly scrapingDate)
+        private static AccommodationListing MapListing(ScrapedAccommodation item, int platformId, LocalityBoundary? region, AccommodationEstablishment? establishment, DateOnly scrapingDate)
         {
+            DiscoveredAccommodation accommodation = item.Accommodation;
+            AccommodationDetails details = item.Details;
+
             Point? coordinates = null;
             if (accommodation.Latitude != null && accommodation.Longitude != null)
             {
@@ -137,19 +246,19 @@ namespace Toeristenscraper.Scraper.Storage
                 PlatformId = platformId,
                 SourceId = accommodation.SourceId,
                 Title = accommodation.Title,
-                AccommodationType = accommodation.AccommodationType,
+                AccommodationType = details.AccommodationType ?? accommodation.AccommodationType,
                 Coordinates = coordinates,
-                IsExactLocation = accommodation.IsExactLocation,
+                IsExactLocation = details.IsExactLocation ?? accommodation.IsExactLocation,
                 City = region?.City,
                 Municipality = region?.Municipality,
                 Province = region?.Province,
                 Address = accommodation.Address,
                 StarClassification = accommodation.StarClassification,
-                Superhost = accommodation.Superhost,
+                Superhost = details.Superhost ?? accommodation.Superhost,
+                KVKNumber = details.KvkNumber,
+                AccommodationEstablishment = establishment,
                 URL = accommodation.URL,
                 ScrapingDate = scrapingDate
-
-                // kvknummer en AccommodationEstablishmentId (registratienummers) missen hier nog, wordt toegevoegd zodra de HTML-bron uitgewerkt wordt
             };
             return accommodationListing;
         }
@@ -179,7 +288,7 @@ namespace Toeristenscraper.Scraper.Storage
             if (candidate.Title != latestExisting.Title || candidate.AccommodationType != latestExisting.AccommodationType ||
                 !SameCoordinates(candidate.Coordinates, latestExisting.Coordinates) || candidate.IsExactLocation != latestExisting.IsExactLocation || candidate.Address != latestExisting.Address ||
                 candidate.StarClassification != latestExisting.StarClassification || candidate.Superhost != latestExisting.Superhost || candidate.URL != latestExisting.URL ||
-                candidate.KVKNumber != latestExisting.KVKNumber || candidate.AccommodationEstablishmentId != latestExisting.AccommodationEstablishmentId ||
+                candidate.KVKNumber != latestExisting.KVKNumber || candidate.AccommodationEstablishment?.AccommodationEstablishmentId != latestExisting.AccommodationEstablishmentId ||
                 candidate.City != latestExisting.City || candidate.Municipality != latestExisting.Municipality || candidate.Province != latestExisting.Province)
             {
                 return true;

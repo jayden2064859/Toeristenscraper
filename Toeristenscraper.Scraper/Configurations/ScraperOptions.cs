@@ -1,4 +1,6 @@
-﻿namespace Toeristenscraper.Scraper.Configuration
+﻿using Toeristenscraper.Scraper.Configurations;
+
+namespace Toeristenscraper.Scraper.Configuration
 {
     // instellingen voor de scraper, uit de sectie "Scraper" in appsettings.json 
     public class ScraperOptions
@@ -9,9 +11,10 @@
         public List<ScrapeArea> Areas { get; set; } = new List<ScrapeArea>();
 
         // instellingen per platform
-        public PlatformOptions Booking { get; set; } = new PlatformOptions();
-        public PlatformOptions Airbnb { get; set; } = new PlatformOptions();
-        public ResilienceOptions Resilience { get; set; } = new ResilienceOptions(); 
+        public PlatformOptions Booking { get; set; } = new PlatformOptions(); // booking heeft geen andere configuraties nodig dan de basis PlatformOptions 
+        public AirbnbOptions Airbnb { get; set; } = new AirbnbOptions(); // airbnb heeft persisted querys en een API key nodig, dus die erft over van PlatformOptions, met twee extra properties
+        public ResilienceOptions Resilience { get; set; } = new ResilienceOptions();
+        public SearchParameterOptions SearchParameters { get; set; } = new SearchParameterOptions();
     }
 
     // een gebied met de bounding box 
@@ -49,5 +52,15 @@
         public int CircuitBreakDurationSeconds { get; set; }
         public double CircuitFailureRatio { get; set; }
         public int TimeoutSeconds { get; set; }
+    }
+
+    // zoekparameters voor detailoperaties die prijzen teruggeven, gelijk voor alle platforms zodat prijzen vergelijkbaar zijn
+    public class SearchParameterOptions
+    {
+        public int CheckInOffsetDays { get; set; }
+        public int Nights { get; set; }
+        public int Adults { get; set; }
+        public int Children { get; set; }
+        public int Pets { get; set; }
     }
 }

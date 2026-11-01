@@ -1,6 +1,6 @@
 {
   "operationName": "StaysSearch",
-  "query": "query StaysSearch($staysSearchRequest: StaysSearchRequest!) { presentation { staysSearch(staysSearchRequest: $staysSearchRequest) { results { searchResults { ... on StaySearchResult { title nameLocalized { localizedStringWithTranslationPreference } badges { loggingContext { badgeType } } listingParamOverrides { photoId categoryTag } demandStayListing { id location { coordinate { latitude longitude } } } } } paginationInfo { pageCursors nextPageCursor } loggingMetadata { legacyLoggingContext { federatedSearchId } } } } } }",
+  "query": "query StaysSearch($staysSearchRequest: StaysSearchRequest!) { presentation { staysSearch(staysSearchRequest: $staysSearchRequest) { results { searchResults { ... on StaySearchResult { title nameLocalized { localizedStringWithTranslationPreference } badges { loggingContext { badgeType } } listingParamOverrides { photoId categoryTag } demandStayListing { id location { coordinate { latitude longitude } } } } } paginationInfo { pageCursors nextPageCursor } } } } }",
   "variables": {
     "staysSearchRequest": {
       "cursor": {{cursor}},

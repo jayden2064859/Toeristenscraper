@@ -9,7 +9,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
     {
         public required DiscoveredAccommodation Accommodation { get; init; }
         public required IReadOnlyList<Availability> Availability { get; init; }
+        public required AccommodationDetails Details { get; init; }
 
-        // later komen hier de overige detailoperaties bij (kamers, voorzieningen, kvk/registratienummers etc) 
     }
 }

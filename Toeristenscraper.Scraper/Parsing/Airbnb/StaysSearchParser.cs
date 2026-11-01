@@ -33,10 +33,6 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
                 }
             }
 
-            // metadata ophalen (nodig voor subsequente api-operaties)
-            string federatedSearchId = GetJsonElementHelper.Get(results, "loggingMetadata", "legacyLoggingContext", "federatedSearchId")?.GetString()
-                ?? throw new InvalidOperationException("StaysSearch: missing required field inside JSON-response: loggingMetadata.legacyLoggingContext.federatedSearchId (needed for StaysPdpSections operation)");
-
             // lijst initialiseren voor elke listing binnen de response
             List<DiscoveredAccommodation> accommodations = new List<DiscoveredAccommodation>();
 
@@ -109,12 +105,7 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
                     Latitude = latitude,
                     Longitude = longitude,
                     Superhost = superhost,
-                    URL = $"https://www.airbnb.nl/rooms/{sourceId}",
-
-                    DetailParameters = new Dictionary<string, string>
-                    {
-                        { "federatedSearchId", federatedSearchId }
-                    }
+                    URL = $"https://www.airbnb.nl/rooms/{sourceId}"
                 });
 
 

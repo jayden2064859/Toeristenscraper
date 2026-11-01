@@ -62,6 +62,18 @@ IHttpClientBuilder pdpAvailabilityCalendarClient = builder.Services.AddHttpClien
     client.Timeout = TimeSpan.FromMinutes(3);
 });
 
+IHttpClientBuilder staysPdpSectionsClient = builder.Services.AddHttpClient<StaysPdpSections>(client =>
+{
+    if (!string.IsNullOrWhiteSpace(airbnbBase))
+    {
+        client.BaseAddress = new Uri(airbnbBase);
+    }
+    client.DefaultRequestHeaders.Add("X-Airbnb-API-Key", builder.Configuration["Scraper:Airbnb:ApiKey"]);
+    client.DefaultRequestHeaders.Accept.Clear();
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+
 IHttpClientBuilder fullSearchClient = builder.Services.AddHttpClient<FullSearch>(client =>
 {
     if (!string.IsNullOrWhiteSpace(bookingBase))
@@ -85,19 +97,25 @@ IHttpClientBuilder availabilityCalendarClient = builder.Services.AddHttpClient<A
 });
 
 // per http-client de request delay + resilience strategy handlers toevoegen
+
+// Airbnb
 staysSearchClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
 staysSearchClient.AddResilienceHandler("airbnb-staysearch", ResiliencePipelineSetup.Configure);
 
 pdpAvailabilityCalendarClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
 pdpAvailabilityCalendarClient.AddResilienceHandler("airbnb-availability", ResiliencePipelineSetup.Configure);
 
+staysPdpSectionsClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
+staysPdpSectionsClient.AddResilienceHandler("airbnb-stayspdpsections", ResiliencePipelineSetup.Configure);
+
+// Booking.com
 fullSearchClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
 fullSearchClient.AddResilienceHandler("booking-fullsearch", ResiliencePipelineSetup.Configure);
 
 availabilityCalendarClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
 availabilityCalendarClient.AddResilienceHandler("booking-availability", ResiliencePipelineSetup.Configure);
 
-//  transient services registreren (nieuwe instantie per request) 
+// transient services registreren (nieuwe instantie per request) 
 builder.Services.AddTransient<TileAlgorithm>();
 builder.Services.AddTransient<ScrapeOrchestrator>();
 builder.Services.AddTransient<BookingRequestDelayHandler>();

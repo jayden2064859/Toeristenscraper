@@ -83,5 +83,10 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
             }
             return allDays;
         }
+
+        public Task<AccommodationDetails> GetDetailsAsync(DiscoveredAccommodation listing, IReadOnlyList<Availability> availability, CancellationToken ct)
+        {
+            return Task.FromResult(new AccommodationDetails());
+        }
     }
 }

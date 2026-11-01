@@ -1,0 +1,36 @@
+{
+  "operationName": "StaysPdpSections",
+  "variables": {
+    "id": "{{stayListingId}}",
+    "demandStayListingId": "{{demandStayListingId}}",
+    "pdpSectionsRequest": {
+      "adults": "{{adultCount}}",
+      "children": "{{childrenCount}}",
+      "pets": {{petCount}},
+      "checkIn": "{{checkIn}}",
+      "checkOut": "{{checkOut}}",
+      "layouts": [ "SIDEBAR", "SINGLE_COLUMN" ],
+      "useNewSectionWrapperApi": false,
+      "sectionIds": [ "BOOK_IT_NAV", "PROPERTY_AVAILABLE_ROOMS", "BOOK_IT_SIDEBAR", "POLICIES_DEFAULT", "PROPERTY_BOOK_IT_FLOATING_FOOTER", "BOOK_IT_CALENDAR_SHEET" ]
+    },
+    "guestCounts": null,
+    "includePdpMigrationBookItNavFragment": false,
+    "includeGpBookItFragment": true,
+    "includePdpMigrationBookItFloatingFooterFragment": false,
+    "includePdpMigrationBookItSidebarFragment": false,
+    "includePdpMigrationBookItCalendarSheetFragment": false,
+    "includePdpMigrationBookItNonExperiencedGuestFragment": false,
+    "includePdpMigrationAmenitiesFragment": true,
+    "includeGpBookItNonExperiencedGuestFragment": true,
+    "includePdpMigrationPropertyAvailableRoomsFragment": false,
+    "includeGpPropertyAvailableRoomsFragment": true,
+    "includeRecentAskPdpQuestions": false,
+    "includePdpOffers": false
+  },
+  "extensions": {
+    "persistedQuery": {
+      "version": 1,
+      "sha256Hash": "{{hash}}"
+    }
+  }
+}

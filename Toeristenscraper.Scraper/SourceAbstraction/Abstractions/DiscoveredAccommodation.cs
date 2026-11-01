@@ -4,10 +4,9 @@ using System.Text;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
 {
-    // een accommodatie zoals gevonden door de zoekoperatie (FullSearch) 
     public class DiscoveredAccommodation
     {
-        // alle velden die in de payload van de zoekoperatie worden teruggegeven 
+        // alle velden die in de payload van de zoekoperatie worden teruggegeven kunnen worden (StaysSearch, FullSearch)
         public required string SourceId { get; init; }
         public string? Title { get; init; }
 
