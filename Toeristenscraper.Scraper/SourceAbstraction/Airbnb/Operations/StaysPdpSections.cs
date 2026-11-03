@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
@@ -38,6 +37,18 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations
             // request versturen
             using var content = new StringContent(body, Encoding.UTF8, "application/json");
             using var response = await httpClient.PostAsync("api/v3", content, ct);
+
+            // de api operatie geeft response 400 'persisted_query_not_found' terug wanneer de meegegeven hash in de request body verlopen is
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                string errorBody = await response.Content.ReadAsStringAsync(ct);
+                if (errorBody.Contains("persisted_query_not_found"))
+                {
+                    throw new InvalidOperationException("StaysPdpSections: persisted query hash is outdated (HTTP 400 persisted_query_not_found)");
+                }
+            }
+            response.EnsureSuccessStatusCode();
+
             response.EnsureSuccessStatusCode();
 
             // opgehaalde response returnen

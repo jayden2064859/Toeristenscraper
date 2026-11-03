@@ -15,9 +15,12 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
         private static readonly Regex RegistrationRegex = new Regex(@"<b>\s*(Registratiegegevens|Registratienummer|Licentienummer)\s*</b>\s*<br\s*/?>\s*([^<]+)", RegexOptions.IgnoreCase);
         private static readonly Regex KvkRegex = new Regex(@"(Bedrijfsregistratienummer|KVK-nummer|Nummer handelsregister)\s*:\s*(\d{8})", RegexOptions.IgnoreCase);
 
+
+
         // methode die alle benodigde data uit een StaysPdpSections response parsed
         public static AccommodationDetails Parse(JsonDocument doc, DateOnly checkIn, DateOnly checkOut, int adults, int children, int pets)
         {
+
             if (doc.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array)
             {
                 throw new InvalidOperationException("StaysPdpSections: response contains GraphQL errors: " + errors.ToString());
@@ -45,8 +48,16 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
                 isExactLocation = isExactLocationElement.Value.GetBoolean();
             }
 
+            // exacte adres (alleen aanwezig als field als IsExactLocation = true)
+            string? exactAddress = null;
+            JsonElement? exactAddressElement = GetJsonElementHelper.Get(pdpPresentation, "location", "exactAddress", "address");
+            if (exactAddressElement != null)
+            {
+                exactAddress = exactAddressElement.Value.GetString();
+            }
+
             // totaal aantal reviews
-            int? ratingCount = null;
+            int ? ratingCount = null;
             JsonElement? ratingCountElement = GetJsonElementHelper.Get(pdpPresentation, "quality", "listingRatingStats", "overallRatingStats", "ratingCount");
             if (ratingCountElement != null && int.TryParse(ratingCountElement.Value.GetString(), out int parsedCount))
             {
@@ -120,6 +131,7 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
             {
                 AccommodationType = propertyType,
                 IsExactLocation = isExactLocation,
+                Address = exactAddress,
                 ReviewCount = ratingCount,
                 AverageReviewScore = ratingAverage,
                 Superhost = superhost,

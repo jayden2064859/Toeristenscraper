@@ -12,6 +12,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
         public int? ReviewCount { get; init; }
         public decimal? AverageReviewScore { get; init; }
         public bool? IsExactLocation { get; init; }
+        public string? Address { get; init; }
         public string? KvkNumber { get; init; }
         public string? RegistrationNumber { get; init; }
 

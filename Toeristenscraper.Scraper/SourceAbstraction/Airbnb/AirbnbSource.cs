@@ -18,6 +18,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb
         public async Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken ct)
         {
             using JsonDocument firstDoc = await staysSearch.GetPageAsync(tile, null, ct); // eerste pagina heeft cursor 'null' 
+
             var firstPage = StaysSearchParser.Parse(firstDoc);
 
             // limiet bereikt = tegel opsplitsen

@@ -65,7 +65,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
 
                 if (result.LimitReached == false)
                 {
-                    // lijst van accommodaties (parsed data voor het datamodel) teruggeven wanneer een response <1000 accommodatie-listings bevat
+                    // lijst van accommodaties (parsed data voor het datamodel) teruggeven wanneer een response onder de resultatenlimiet zit 
                     foundAccommodations.AddRange(result.Accommodations);
                 }
                 else if (result.LimitReached == true && tile.Depth < maxDepth)

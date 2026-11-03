@@ -252,7 +252,7 @@ namespace Toeristenscraper.Scraper.Storage
                 City = region?.City,
                 Municipality = region?.Municipality,
                 Province = region?.Province,
-                Address = accommodation.Address,
+                Address = details.Address ?? accommodation.Address,  // exacte adres: niet altijd aanwezig, Airbnb toont het vooral bij accommodaties met een exacte locatie (zoals hotels), maar zelfs dan niet altijd.
                 StarClassification = accommodation.StarClassification,
                 Superhost = details.Superhost ?? accommodation.Superhost,
                 KVKNumber = details.KvkNumber,

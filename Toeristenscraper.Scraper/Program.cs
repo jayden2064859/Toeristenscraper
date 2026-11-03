@@ -120,7 +120,7 @@ builder.Services.AddTransient<TileAlgorithm>();
 builder.Services.AddTransient<ScrapeOrchestrator>();
 builder.Services.AddTransient<BookingRequestDelayHandler>();
 builder.Services.AddTransient<AirbnbRequestDelayHandler>();
-//builder.Services.AddTransient<IAccommodationSource, BookingSource>();
+//builder.Services.AddTransient<IAccommodationSource, BookingSource>(); 
 builder.Services.AddTransient<IAccommodationSource, AirbnbSource>();
 builder.Services.AddScoped<WriteToDb>();
 
