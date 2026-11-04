@@ -29,6 +29,13 @@ De totaalprijs is de regel "Totaal" uit de prijsopbouw, of anders de som van all
 
 De parser verwacht Nederlandse teksten en m². De BaseUrl van Airbnb moet daarom https://www.airbnb.nl/ zijn.
 
+## Persisted query hash vernieuwen
+StaysPdpSections (Airbnb) wordt aangeroepen met een persisted query: in plaats van de volledige querytekst stuurt de request een SHA-256-hash mee, waaronder de query op de server van Airbnb is geregistreerd. Een eigen querytekst werkt ook, maar geeft de prijs en de kamernaam niet terug. Daarom wordt de hash gebruikt. De startwaarde staat in appsettings.json (StaysPdpSectionsHash).
+
+Airbnb wijzigt deze hash af en toe. Een verouderde hash geeft een HTTP 400 met persisted_query_not_found. StaysPdpSections herkent deze fout, waarna AirbnbHashProvider met Playwright (headless Chromium) de listingpagina opent. De website verstuurt daarbij zelf een StaysPdpSections-request, met de geldige hash als laatste deel van de URL. Die hash wordt overgenomen en in het geheugen bijgewerkt, en de request wordt één keer herhaald. Daarna gebruiken alle volgende requests de nieuwe hash, zolang de applicatie draait.
+
+appsettings.json wordt niet aangepast. Na een herstart begint de scraper weer met de startwaarde en wordt de hash zo nodig opnieuw vernieuwd. De nieuwe hash staat in de log en kan handmatig in appsettings.json worden gezet. Lukt het vernieuwen niet, dan stopt het scrapen voor Airbnb en wordt een Error gelogd.
+
 ## Zoekparameters voor prijzen
 Prijzen horen bij een zoekopdracht. De zoekparameters staan in de sectie SearchParameters en zijn gelijk voor alle platforms, zodat prijzen vergelijkbaar zijn. De aankomstdatum is de scrapedatum plus CheckInOffsetDays. Het aantal nachten is Nights, of meer als de accommodatie op de aankomstdatum een langere minimale verblijfsduur heeft, omdat het platform anders geen prijs geeft. Het aantal gasten staat in Adults, Children en Pets.
 
