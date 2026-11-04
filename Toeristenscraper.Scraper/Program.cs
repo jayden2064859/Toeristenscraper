@@ -122,7 +122,9 @@ builder.Services.AddTransient<BookingRequestDelayHandler>();
 builder.Services.AddTransient<AirbnbRequestDelayHandler>();
 //builder.Services.AddTransient<IAccommodationSource, BookingSource>(); 
 builder.Services.AddTransient<IAccommodationSource, AirbnbSource>();
+
 builder.Services.AddScoped<WriteToDb>();
+builder.Services.AddSingleton<AirbnbHashProvider>();
 
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "HH:mm:ss ");
 

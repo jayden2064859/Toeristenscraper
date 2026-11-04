@@ -4,10 +4,11 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
+using Toeristenscraper.Scraper.Transport;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations
 {
-    public class StaysPdpSections(HttpClient httpClient, IOptions<ScraperOptions> options) 
+    public class StaysPdpSections(HttpClient httpClient, IOptions<ScraperOptions> options, AirbnbHashProvider hashProvider) 
     {
         private static readonly string BodyTemplate = File.ReadAllText(
         Path.Combine(AppContext.BaseDirectory, "SourceAbstraction", "Airbnb", "Queries", "StaysPdpSections.json"));
@@ -26,7 +27,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations
                 .Replace("{{stayListingId}}", stayListingId)
                 .Replace("{{demandStayListingId}}", demandStayListingId)
                 .Replace("{{hash}}", options.Value.Airbnb.StaysPdpSectionsHash)
-                
+
                 // zoekparameters
                 .Replace("{{checkIn}}", checkIn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
                 .Replace("{{checkOut}}", checkOut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
@@ -42,13 +43,12 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations
             if (response.StatusCode == HttpStatusCode.BadRequest)
             {
                 string errorBody = await response.Content.ReadAsStringAsync(ct);
-                if (errorBody.Contains("persisted_query_not_found"))
+                if (errorBody.Contains("persisted_query_not_found") || errorBody.Contains("PersistedQueryNotFound"))
                 {
-                    throw new InvalidOperationException("StaysPdpSections: persisted query hash is outdated (HTTP 400 persisted_query_not_found)");
+                    await hashProvider.RefreshAsync(sourceId);
+                    return await GetPageAsync(sourceId, checkIn, checkOut, ct);
                 }
             }
-            response.EnsureSuccessStatusCode();
-
             response.EnsureSuccessStatusCode();
 
             // opgehaalde response returnen

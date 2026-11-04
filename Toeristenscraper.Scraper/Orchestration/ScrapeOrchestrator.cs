@@ -128,7 +128,11 @@ namespace Toeristenscraper.Scraper.Orchestration
                             {
                                 throw; // platform stopt met scrapen bij een 404 (not found)
                             }
-                            if (IsDatabaseUnavailable(ex))
+                            if (ex is OutdatedHashException)
+                            {
+                                throw; // platform stopt: zonder geldige hash mislukken alle subsequente listings ook
+                            }
+                            if (IsDatabaseUnavailable(ex)) // database wordt 5x opnieuw geprobeerd (config in program.cs) daarna stopt het platform met scrapen
                             {
                                 throw;
                             }
