@@ -41,6 +41,8 @@ Prijzen horen bij een zoekopdracht. De zoekparameters staan in de sectie SearchP
 
 Bij elke kamer worden de gebruikte zoekparameters opgeslagen (CheckInDate, CheckOutDate, AdultCount, ChildCount en PetCount). Omdat het aantal nachten per accommodatie kan verschillen, worden prijzen vergeleken als prijs per nacht. Is een accommodatie op de aankomstdatum niet beschikbaar, dan is er die dag geen prijs.
 
+De scraper zoekt alleen met volwassenen. Kinderen worden niet ondersteund, omdat Booking.com een leeftijd per kind vereist en Airbnb kinderen en baby’s apart telt. Die leeftijden worden niet in het datamodel opgeslagen, waardoor een prijs met kinderen niet meer te herleiden zou zijn tot de zoekopdracht. Omdat zoekparameters inclusief kinderen geen eis van de opdrachtgever zijn, is ervoor gekozen dit niet uit te werken. Is Children groter dan 0 in de configuratie, dan stopt de Booking-operatie met een foutmelding.
+
 ## Opslag
 De listings worden per batch van 100 weggeschreven door WriteToDb, met één SaveChanges per batch.
 
