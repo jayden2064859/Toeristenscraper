@@ -54,6 +54,10 @@ Het datamodel gaat uit van maximaal één scrape per listing per dag, omdat Scra
 
 De tabel met beschikbaarheid is een TimescaleDB-hypertable op ScrapingDate. Een compressiebeleid comprimeert elke scrapedag zodra deze ouder is dan één dag. Woonplaats, gemeente en provincie worden bij het opslaan bepaald uit de coördinaten, met een ruimtelijke query (PostGIS) op de referentietabel ref_locality_boundary.
 
+Een kamer-record in AccommodationRoom zonder SourceRoomId is een accommodatie zonder kamertypen, die als geheel wordt verhuurd. Listings zonder afzonderlijke kamers worden alsnog in AccommodationRoom gemodelleerd, zodat er geen onnodige extra kolommen in AccommodationListing nodig zijn. 
+
+Een kamer-record in AccommodationRoom die geen prijs bevat (TotalPrice null) is een kamer die op de aankomstdatum van de scrape niet beschikbaar voor boeking was.
+
 ## Foutafhandeling
 Elke operatie heeft een eigen Polly-pipeline. Bij een 5xx-fout, een netwerkfout of een timeout wordt de request opnieuw geprobeerd. Bij een 429 (te veel requests) wordt eerst gewacht en dan opnieuw geprobeerd. Blijft het platform 429 teruggeven, dan opent de circuit breaker en stopt het scrapen voor dat platform. Bij een 404 stopt het platform ook, omdat de operatie dan waarschijnlijk niet meer bestaat.
 
