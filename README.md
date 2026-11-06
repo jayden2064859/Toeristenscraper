@@ -86,9 +86,7 @@ docker run --rm ghcr.io/osgeo/gdal:ubuntu-small-latest ogr2ogr -f PostgreSQL "PG
 De BAG-velden worden zo gekoppeld: woonplaats wordt city, bronhouder_naam wordt municipality en provincie_naam wordt province. Na de import bevat de tabel ongeveer 2500 woonplaatsen. De import wordt bij voorkeur jaarlijks opnieuw uitgevoerd, omdat gemeentelijke herindelingen meestal op 1 januari ingaan.
 
 ## To do
-- Detailoperaties van Booking.com (kamers, prijzen, KVK- en registratienummer)
-- De persisted query hash van StaysPdpSections (Airbnb) automatisch vernieuwen via Playwright wanneer de huidige verlopen is
 - Logging via Serilog naar Azure Blob Storage, uitgelezen door Wazuh, en een alert naar de systeembeheerder wanneer een platform stopt
-- Unit- en integratietests (xUnit)
 - Analyse-component
 - Presentatielaag
+- Unit- en integratietests (xUnit)
