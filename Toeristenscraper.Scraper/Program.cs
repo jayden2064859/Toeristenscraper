@@ -22,7 +22,6 @@ builder.Services.AddHostedService<Worker>();
 builder.Services.Configure<ScraperOptions>(
     builder.Configuration.GetSection(ScraperOptions.SectionName));
 
-
 builder.Services.Configure<ScheduleOptions>(
         builder.Configuration.GetSection(ScheduleOptions.SectionName));
 
@@ -96,6 +95,19 @@ IHttpClientBuilder availabilityCalendarClient = builder.Services.AddHttpClient<A
     client.Timeout = TimeSpan.FromMinutes(3);
 });
 
+IHttpClientBuilder htmlClient = builder.Services.AddHttpClient<HTML>(client =>
+{
+    if (!string.IsNullOrWhiteSpace(bookingBase))
+    {
+        client.BaseAddress = new Uri(bookingBase);
+    }
+    // user agent header is nodig, anders ziet Booking.com de HTML requests als bot requests, en worden de zoekparameters volledig genegeerd, waardoor kamerprijzen nooit teruggegeven worden
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+    client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("nl-NL,nl;q=0.9");
+    client.Timeout = TimeSpan.FromMinutes(3);
+}).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false });
+
+
 // per http-client de request delay + resilience strategy handlers toevoegen
 
 // Airbnb
@@ -115,16 +127,23 @@ fullSearchClient.AddResilienceHandler("booking-fullsearch", ResiliencePipelineSe
 availabilityCalendarClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
 availabilityCalendarClient.AddResilienceHandler("booking-availability", ResiliencePipelineSetup.Configure);
 
+htmlClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
+htmlClient.AddResilienceHandler("booking-html", ResiliencePipelineSetup.Configure);
+
+
+
 // transient services registreren (nieuwe instantie per request) 
 builder.Services.AddTransient<TileAlgorithm>();
 builder.Services.AddTransient<ScrapeOrchestrator>();
 builder.Services.AddTransient<BookingRequestDelayHandler>();
 builder.Services.AddTransient<AirbnbRequestDelayHandler>();
-//builder.Services.AddTransient<IAccommodationSource, BookingSource>(); 
+builder.Services.AddTransient<IAccommodationSource, BookingSource>(); 
 builder.Services.AddTransient<IAccommodationSource, AirbnbSource>();
 
 builder.Services.AddScoped<WriteToDb>();
+
 builder.Services.AddSingleton<AirbnbHashProvider>();
+builder.Services.AddSingleton<BookingCookieProvider>();
 
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "HH:mm:ss ");
 

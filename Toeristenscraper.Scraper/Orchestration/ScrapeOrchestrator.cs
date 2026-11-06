@@ -102,8 +102,8 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                             // detailoperaties van de listing uitvoeren om het datamodel te vullen
                             AccommodationDetails details = await source.GetDetailsAsync(listing, availabilityDays, ct);
-                            logger.LogDebug("\nStaysPdpSections (Listing {SourceId}): type {Type}, reviews {Count}/{Score}, superhost {Superhost}, KVK {Kvk}, registratie {Registration}, {Rooms} kamers, {Amenities} voorzieningen",
-                                                listing.SourceId, details.AccommodationType, details.ReviewCount, details.AverageReviewScore, details.Superhost, details.KvkNumber, details.RegistrationNumber, details.Rooms.Count, details.Amenities.Count);
+                            logger.LogDebug("\n{Platform} (Listing {SourceId}): type {Type}, reviews {Count}/{Score}, superhost {Superhost}, KVK {Kvk}, registratie {Registration}, {Rooms} kamers, {Amenities} voorzieningen",
+                                                source.PlatformName, listing.SourceId, details.AccommodationType, details.ReviewCount, details.AverageReviewScore, details.Superhost, details.KvkNumber, details.RegistrationNumber, details.Rooms.Count, details.Amenities.Count);
 
                             // testlog
                             foreach (RoomDetails room in details.Rooms)
@@ -128,9 +128,9 @@ namespace Toeristenscraper.Scraper.Orchestration
                             {
                                 throw; // platform stopt met scrapen bij een 404 (not found)
                             }
-                            if (ex is OutdatedHashException)
-                            {
-                                throw; // platform stopt: zonder geldige hash mislukken alle subsequente listings ook
+                            if (ex is OutdatedHashException || ex is BlockedException) 
+                            { 
+                                throw; 
                             }
                             if (IsDatabaseUnavailable(ex)) // database wordt 5x opnieuw geprobeerd (config in program.cs) daarna stopt het platform met scrapen
                             {

@@ -7,6 +7,7 @@
     <UserSecretsId>dotnet-Toeristenscraper.Scraper-df313802-ad4c-45f8-818c-20bffebdc4b6</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

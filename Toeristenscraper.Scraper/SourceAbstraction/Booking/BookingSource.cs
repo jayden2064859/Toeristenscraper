@@ -8,7 +8,7 @@ using Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations;
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 {
     // implementeert IAccommodationSource: eerst pagina 1, bij >1000 resultaten meteen “limiet bereikt”, anders de overige pagina’s ophalen via offset
-    public class BookingSource(FullSearch fullSearch, AvailabilityCalendar availabilityCalendar, IOptions<ScraperOptions> options, ILogger<BookingSource> logger) : IAccommodationSource
+    public class BookingSource(FullSearch fullSearch, AvailabilityCalendar availabilityCalendar, HTML html, IOptions<ScraperOptions> options, ILogger<BookingSource> logger) : IAccommodationSource
     {
         public string PlatformName { get; } = "Booking.com";
         public int PlatformId { get; } = 1;
@@ -84,9 +84,28 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
             return allDays;
         }
 
-        public Task<AccommodationDetails> GetDetailsAsync(DiscoveredAccommodation listing, IReadOnlyList<Availability> availability, CancellationToken ct)
+        public async Task<AccommodationDetails> GetDetailsAsync(DiscoveredAccommodation listing, IReadOnlyList<Availability> availability, CancellationToken ct)
         {
-            return Task.FromResult(new AccommodationDetails());
+            // search parameter opties uit appsettings worden gebruikt, gelijk aan Airbnb zodat prijzen vergelijkbaar zijn
+            SearchParameterOptions search = options.Value.SearchParameters;
+            DateOnly checkIn = DateOnly.FromDateTime(DateTime.Today).AddDays(search.CheckInOffsetDays);
+
+            // aantal nachten: standaard het geconfigureerde aantal, of de minimale verblijfsduur op de incheckdatum als die langer is
+            int nights = search.Nights;
+            foreach (Availability day in availability)
+            {
+                if (day.AvailabilityDate == checkIn && day.MinLengthOfStay != null && day.MinLengthOfStay.Value > nights)
+                {
+                    nights = day.MinLengthOfStay.Value;
+                }
+            }
+            DateOnly checkOut = checkIn.AddDays(nights);
+
+            string pageName = listing.DetailParameters["pageName"];
+
+            using JsonDocument doc = await html.GetPageAsync(pageName, checkIn, checkOut, ct);
+            return HTMLParser.Parse(doc, checkIn, checkOut, search.Adults, search.Children, search.Pets);
         }
     }
 }
+
