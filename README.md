@@ -29,10 +29,19 @@ De totaalprijs is de regel "Totaal" uit de prijsopbouw, of anders de som van all
 
 De parser verwacht Nederlandse teksten en m². De BaseUrl van Airbnb moet daarom https://www.airbnb.nl/ zijn.
 
+## Persisted query hash vernieuwen
+StaysPdpSections (Airbnb) wordt aangeroepen met een persisted query: in plaats van de volledige querytekst stuurt de request een SHA-256-hash mee, waaronder de query op de server van Airbnb is geregistreerd. Een eigen querytekst werkt ook, maar geeft de prijs en de kamernaam niet terug. Daarom wordt de hash gebruikt. De startwaarde staat in appsettings.json (StaysPdpSectionsHash).
+
+Airbnb wijzigt deze hash af en toe. Een verouderde hash geeft een HTTP 400 met persisted_query_not_found. StaysPdpSections herkent deze fout, waarna AirbnbHashProvider met Playwright (headless Chromium) de listingpagina opent. De website verstuurt daarbij zelf een StaysPdpSections-request, met de geldige hash als laatste deel van de URL. Die hash wordt overgenomen en in het geheugen bijgewerkt, en de request wordt één keer herhaald. Daarna gebruiken alle volgende requests de nieuwe hash, zolang de applicatie draait.
+
+appsettings.json wordt niet aangepast. Na een herstart begint de scraper weer met de startwaarde en wordt de hash zo nodig opnieuw vernieuwd. De nieuwe hash staat in de log en kan handmatig in appsettings.json worden gezet. Lukt het vernieuwen niet, dan stopt het scrapen voor Airbnb en wordt een Error gelogd.
+
 ## Zoekparameters voor prijzen
 Prijzen horen bij een zoekopdracht. De zoekparameters staan in de sectie SearchParameters en zijn gelijk voor alle platforms, zodat prijzen vergelijkbaar zijn. De aankomstdatum is de scrapedatum plus CheckInOffsetDays. Het aantal nachten is Nights, of meer als de accommodatie op de aankomstdatum een langere minimale verblijfsduur heeft, omdat het platform anders geen prijs geeft. Het aantal gasten staat in Adults, Children en Pets.
 
 Bij elke kamer worden de gebruikte zoekparameters opgeslagen (CheckInDate, CheckOutDate, AdultCount, ChildCount en PetCount). Omdat het aantal nachten per accommodatie kan verschillen, worden prijzen vergeleken als prijs per nacht. Is een accommodatie op de aankomstdatum niet beschikbaar, dan is er die dag geen prijs.
+
+De scraper zoekt alleen met volwassenen. Kinderen worden niet ondersteund, omdat Booking.com een leeftijd per kind vereist en Airbnb kinderen en baby’s apart telt. Die leeftijden worden niet in het datamodel opgeslagen, waardoor een prijs met kinderen niet meer te herleiden zou zijn tot de zoekopdracht. Omdat zoekparameters inclusief kinderen geen eis van de opdrachtgever zijn, is ervoor gekozen dit niet uit te werken. Is Children groter dan 0 in de configuratie, dan stopt de Booking-operatie met een foutmelding.
 
 ## Opslag
 De listings worden per batch van 100 weggeschreven door WriteToDb, met één SaveChanges per batch.
@@ -44,6 +53,10 @@ Hetzelfde gegeven kan uit de zoekresultaten en uit de details komen. De waarde u
 Het datamodel gaat uit van maximaal één scrape per listing per dag, omdat ScrapingDate een datum is. Bij een tweede run op dezelfde dag worden de beschikbaarheid, de kamers en de voorzieningen van al gescrapete listings overgeslagen.
 
 De tabel met beschikbaarheid is een TimescaleDB-hypertable op ScrapingDate. Een compressiebeleid comprimeert elke scrapedag zodra deze ouder is dan één dag. Woonplaats, gemeente en provincie worden bij het opslaan bepaald uit de coördinaten, met een ruimtelijke query (PostGIS) op de referentietabel ref_locality_boundary.
+
+Een kamer-record in AccommodationRoom zonder SourceRoomId is een accommodatie zonder kamertypen, die als geheel wordt verhuurd. Listings zonder afzonderlijke kamers worden alsnog in AccommodationRoom gemodelleerd, zodat er geen onnodige extra kolommen in AccommodationListing nodig zijn. 
+
+Een kamer-record in AccommodationRoom die geen prijs bevat (TotalPrice null) is een kamer die op de aankomstdatum van de scrape niet beschikbaar voor boeking was.
 
 ## Foutafhandeling
 Elke operatie heeft een eigen Polly-pipeline. Bij een 5xx-fout, een netwerkfout of een timeout wordt de request opnieuw geprobeerd. Bij een 429 (te veel requests) wordt eerst gewacht en dan opnieuw geprobeerd. Blijft het platform 429 teruggeven, dan opent de circuit breaker en stopt het scrapen voor dat platform. Bij een 404 stopt het platform ook, omdat de operatie dan waarschijnlijk niet meer bestaat.
@@ -73,9 +86,7 @@ docker run --rm ghcr.io/osgeo/gdal:ubuntu-small-latest ogr2ogr -f PostgreSQL "PG
 De BAG-velden worden zo gekoppeld: woonplaats wordt city, bronhouder_naam wordt municipality en provincie_naam wordt province. Na de import bevat de tabel ongeveer 2500 woonplaatsen. De import wordt bij voorkeur jaarlijks opnieuw uitgevoerd, omdat gemeentelijke herindelingen meestal op 1 januari ingaan.
 
 ## To do
-- Detailoperaties van Booking.com (kamers, prijzen, KVK- en registratienummer)
-- De persisted query hash van StaysPdpSections (Airbnb) automatisch vernieuwen via Playwright wanneer de huidige verlopen is
 - Logging via Serilog naar Azure Blob Storage, uitgelezen door Wazuh, en een alert naar de systeembeheerder wanneer een platform stopt
-- Unit- en integratietests (xUnit)
 - Analyse-component
 - Presentatielaag
+- Unit- en integratietests (xUnit)
