@@ -33,7 +33,7 @@ namespace Toeristenscraper.Scraper.Transport
                     throw new BlockedException("Booking.com: aws-waf-token not found after Playwright session");
                 }
                 Cookie = awsWafToken;
-                logger.LogWarning("Booking.com: aws-waf-token refreshed");
+                logger.LogWarning("\nBooking.com: aws-waf-token refreshed");
             }
             catch (PlaywrightException ex)
             {

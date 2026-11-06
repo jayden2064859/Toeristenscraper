@@ -4,6 +4,7 @@ using Polly.CircuitBreaker;
 using System.Diagnostics;
 using System.Net;
 using Toeristenscraper.Scraper.Configuration;
+using Toeristenscraper.Scraper.Reporting;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
 using Toeristenscraper.Scraper.Storage;
@@ -19,19 +20,18 @@ namespace Toeristenscraper.Scraper.Orchestration
             Guid runId = Guid.NewGuid();
             Stopwatch stopwatch = Stopwatch.StartNew();
 
-            // logging-gerelateerde variables
-            List<string> stoppedPlatforms = new List<string>();
-            List<string> failedTiles = new List<string>();
-            int retrievedListings = 0;
-            int failedListings = 0;
-            int totalListings = 0;
-            int skippedForeignListings = 0;
             DateOnly scrapingDate = DateOnly.FromDateTime(DateTime.Today);
+            ScraperunReport report = new ScraperunReport { RunId = runId, StartTime = DateTime.Now, ScrapingDate = scrapingDate };
+
 
             logger.LogInformation("\nScrape-run {RunId} started at {StartTime}\n", runId, DateTime.Now);
 
             foreach (IAccommodationSource source in sources)
             {
+                PlatformRunStats stats = new PlatformRunStats { PlatformName = source.PlatformName, AreaCount = options.Value.Areas.Count };
+                report.Platforms.Add(stats);
+                logger.LogInformation("\n{Platform}: scraping started ({Areas} area(s))", source.PlatformName, options.Value.Areas.Count);
+
                 try
                 {
                     // WriteToDb gebruikt de DbContext, die scoped is. De orchestrator wordt vanuit de singleton Worker aangeroepen,
@@ -54,20 +54,17 @@ namespace Toeristenscraper.Scraper.Orchestration
                         platformResults.AddRange(accommodations);
                         foreach (Tile failedTile in areaFailedTiles)
                         {
-                            failedTiles.Add($"{source.PlatformName}/{area.Name}/{failedTile.Name}");
+                            report.FailedTiles.Add($"{source.PlatformName}/{area.Name}/{failedTile.Name}");
                         }
                     }
 
                     // lijst van alle opgehaalde accommodatie-listings ontdubbelen en in een nieuwe gefilterde lijst zetten
                     List<DiscoveredAccommodation> deduplicatedList = platformResults.DistinctBy(accommodation => accommodation.SourceId).ToList();
 
-                    // loggen hoeveel unieke accommodaties er opgehaald zijn
-                    int uniqueListings = deduplicatedList.Count;
-                    retrievedListings += uniqueListings;
-                    totalListings += uniqueListings;
-                    logger.LogInformation("\nPlatform {Platform}: {UniqueListings} unique listings retrieved", source.PlatformName, uniqueListings);
+                    // aantallen vastleggen voor de samenvatting aan het einde van de run
+                    stats.FoundListings = platformResults.Count;
+                    stats.UniqueListings = deduplicatedList.Count;
 
-                    int foreignListings = 0;
                     // detailoperaties per listing: een mislukte listing wordt overgeslagen, zodat de rest van de run doorgaat 
                     foreach (DiscoveredAccommodation listing in deduplicatedList)
                     {
@@ -76,7 +73,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                         {
                             if (!string.Equals(listing.CountryCode, "nl", StringComparison.OrdinalIgnoreCase))
                             {
-                                foreignListings += 1;
+                                stats.ForeignListings += 1;
                                 continue;
                             }
                         }
@@ -86,36 +83,23 @@ namespace Toeristenscraper.Scraper.Orchestration
                             bool isDutchListing = await dbWriter.IsDutchListingAsync(listing.Latitude, listing.Longitude, ct);
                             if (!isDutchListing)
                             {
-                                foreignListings += 1;
+                                stats.ForeignListings += 1;
                                 continue;
                             }
                         }
-
                         try
                         {
                             // beschikbaarheid van de listing ophalen 
                             IReadOnlyList<Availability> availabilityDays = await source.GetAvailabilityAsync(listing, ct);
-                            if (availabilityDays.Count > 0)
-                            {
-                                logger.LogDebug("\nAvailabilityCalendar (Listing {SourceId}): {Days} days, from {First} to {Last}, {Available} available", listing.SourceId, availabilityDays.Count, availabilityDays.Min(day => day.AvailabilityDate), availabilityDays.Max(day => day.AvailabilityDate), availabilityDays.Count(day => day.IsAvailable == true));
-                            }
-
-                            // detailoperaties van de listing uitvoeren om het datamodel te vullen
+ 
+                            // detailoperaties van de listing uitvoeren om het datamodel te vullen per listing
                             AccommodationDetails details = await source.GetDetailsAsync(listing, availabilityDays, ct);
-                            logger.LogDebug("\n{Platform} (Listing {SourceId}): type {Type}, reviews {Count}/{Score}, superhost {Superhost}, KVK {Kvk}, registratie {Registration}, {Rooms} kamers, {Amenities} voorzieningen",
-                                                source.PlatformName, listing.SourceId, details.AccommodationType, details.ReviewCount, details.AverageReviewScore, details.Superhost, details.KvkNumber, details.RegistrationNumber, details.Rooms.Count, details.Amenities.Count);
-
-                            // testlog
-                            foreach (RoomDetails room in details.Rooms)
-                            {
-                                logger.LogDebug("Kamer {RoomType}: {Price} totaal, belasting inbegrepen {TaxIncluded}, belasting {Tax}", room.RoomType, room.TotalPrice, room.TaxIncluded, room.TaxAmount);
-                            }
 
                             batch.Add(new ScrapedAccommodation { Accommodation = listing, Availability = availabilityDays, Details = details });
 
                             if (batch.Count == WriteToDb.BatchSize) 
                             {
-                                failedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, ct);
+                                stats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, stats, ct);
                             }
                         }
                         catch (BrokenCircuitException)
@@ -137,68 +121,37 @@ namespace Toeristenscraper.Scraper.Orchestration
                                 throw;
                             }
                             logger.LogWarning(ex, "Listing {SourceId} on {Platform} skipped", listing.SourceId, source.PlatformName);
-                            failedListings += 1;
+                            stats.FailedListings += 1;
                         }
                     }
-                    totalListings -= foreignListings;
-                    skippedForeignListings += foreignListings;
-
                     // laatste batch wegschrijven
-                    int result = await SaveBatchAsync(dbWriter, source, scrapingDate, batch, ct);
-                    failedListings += result; // aantal mislukte listings uit de SaveBatchAsync methode toevoegen aan de variabele voor het totaal aantal mislukte listings
+                    stats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, stats, ct);
 
                 }
                 catch (BrokenCircuitException ex)  // loggen wanneer circuit geopent is (run gestopt for specifiek platform)
                 {
-                    stoppedPlatforms.Add($"{source.PlatformName} (circuit open)");
+                    report.StoppedPlatforms.Add($"{source.PlatformName} (circuit open)");
                     logger.LogError(ex, "Scrape-run {RunId}: circuit opened for {Platform}, platform stopped for this run", runId, source.PlatformName);
                 }
                 catch (Exception ex) 
                 {
-                    stoppedPlatforms.Add($"{source.PlatformName} ({ex.GetType().Name})");
+                    report.StoppedPlatforms.Add($"{source.PlatformName} ({ex.GetType().Name})");
                     logger.LogError(ex, "Scrape-run {RunId}: error occurred on {Platform}", runId, source.PlatformName);
                 }
             }
             // einde run: eindtijd en totale duur van de scraperun loggen.
             stopwatch.Stop();
-
-            // loggen of de scraperuns succesvol zijn uitgevoerd
-            string runStatus;
-            if (stoppedPlatforms.Count == sources.Count() || totalListings > 0 && failedListings == totalListings)
-            {
-                runStatus = "Failed"; // geen enkel platform heeft de run afgemaakt
-            }
-            else if (stoppedPlatforms.Count > 0 || failedTiles.Count > 0 || failedListings > 0)
-            {
-                runStatus = "PartiallyFailed";   
-            }
-            else
-            {
-                runStatus = "Succeeded";
-            }
-
-            // "None" tonen in de logregel als er niets gestopt of mislukt is
-            if (stoppedPlatforms.Count == 0)
-            {
-                stoppedPlatforms.Add("None");
-            }
-            if (failedTiles.Count == 0)
-            {
-                failedTiles.Add("None");
-            }
-
-            logger.LogInformation("\nScrape-run {RunId} completed at {EndTime} with status {RunStatus}.\nStopped platforms: {StoppedPlatforms}.\nFailed tiles: {FailedTiles}.\nTotal unique listings retrieved: {RetrievedListings}\nForeign listings skipped: {SkippedForeignListings}.\nTotal listings (filtered): {TotalListings}.\nFailed listings: {FailedListings}.\nDuration: {TotalDuration}.",
-            runId, DateTime.Now, runStatus, stoppedPlatforms, failedTiles, retrievedListings, skippedForeignListings, totalListings, failedListings, stopwatch.Elapsed);
-
+            report.Duration = stopwatch.Elapsed;
+            report.LogSummary(logger);
         }
 
         // helper method die de WriteBatchAsync methode aanroept om een batch op te slaan naar de database. de helper method geeft het aantal mislukte weggeschreven listings terug
-        private async Task<int> SaveBatchAsync(WriteToDb dbWriter, IAccommodationSource source, DateOnly scrapingDate, List<ScrapedAccommodation> batch, CancellationToken ct)
+        private async Task<int> SaveBatchAsync(WriteToDb dbWriter, IAccommodationSource source, DateOnly scrapingDate, List<ScrapedAccommodation> batch, PlatformRunStats stats, CancellationToken ct)
         {
             int failed = 0;
             try
             {
-                await dbWriter.WriteBatchAsync(source.PlatformId, scrapingDate, batch, ct);
+                await dbWriter.WriteBatchAsync(source.PlatformId, scrapingDate, batch, stats, ct);
             }
             catch (Exception ex)
             {

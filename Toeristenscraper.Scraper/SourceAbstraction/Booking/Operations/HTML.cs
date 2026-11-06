@@ -9,7 +9,7 @@ using Toeristenscraper.Scraper.Transport;
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations
 {
     // HTML van accommodatiepagina's worden opgehaald om voorzieningen en kamergerelateerde data per listing op te halen
-    public class HTML(HttpClient httpClient, IOptions<ScraperOptions> options, BookingCookieProvider cookieProvider, ILogger<HTML> logger)
+    public class HTML(HttpClient httpClient, IOptions<ScraperOptions> options, BookingCookieProvider cookieProvider)
     {
         public async Task<JsonDocument> GetPageAsync(string pageName, DateOnly checkIn, DateOnly checkOut, CancellationToken ct)
         {

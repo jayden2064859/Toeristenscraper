@@ -57,11 +57,9 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                     continue;   // door met de volgende tegel in de queue
                 }
 
-
-
                 // loggen op welk tegelniveau momenteel gescraped wordt
                 logger.LogDebug("Tile {Area}/{TileName} (depth {Depth}): limit reached = {LimitReached}, count: {ListingsCount}",
-                tile.Name, area.Name, tile.Depth, result.LimitReached, result.Accommodations.Count());
+                area.Name, tile.Name, tile.Depth, result.LimitReached, result.Accommodations.Count());
 
                 if (result.LimitReached == false)
                 {

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using Toeristenscraper.Scraper.Reporting;
 using Npgsql;
 using Toeristenscraper.Data;
 using Toeristenscraper.Data.Entities;
@@ -10,7 +11,7 @@ namespace Toeristenscraper.Scraper.Storage
     public class WriteToDb(ToeristenscraperDbContext db, ILogger<WriteToDb> logger)
     {
         public const int BatchSize = 100;
-        public async Task WriteBatchAsync(int platformId, DateOnly scrapingDate, IReadOnlyList<ScrapedAccommodation> batch, CancellationToken ct)
+        public async Task WriteBatchAsync(int platformId, DateOnly scrapingDate, IReadOnlyList<ScrapedAccommodation> batch, PlatformRunStats stats, CancellationToken ct)
         {
             if (batch.Count == 0)
             {
@@ -82,7 +83,12 @@ namespace Toeristenscraper.Scraper.Storage
             int newListings = 0;
             int newReviews = 0;
             int newAmenitySets = 0;
+            int newAmenities = 0;
+            int newRoomAmenities = 0;
             int newRooms = 0;
+            int unchangedListings = 0;
+            int skippedAlreadyScraped = 0;
+            int listingsWithAvailability = 0;
 
 
             // meest recent opgeslagen versie van een listing vergelijken met de huidig gescrapete versie. Als er een waarde gewijzigd is, wordt er een nieuw record gemaakt
@@ -119,6 +125,7 @@ namespace Toeristenscraper.Scraper.Storage
                 else
                 {
                     listing = latest;
+                    unchangedListings += 1;
                     logger.LogDebug("Scraped listing {SourceId} has seen no changes since last saved version, skipped saving to database", candidate.SourceId);
                 }
 
@@ -147,6 +154,7 @@ namespace Toeristenscraper.Scraper.Storage
 
                 if (alreadyScrapedToday.Contains(candidate.SourceId))
                 {
+                    skippedAlreadyScraped += 1;
                     logger.LogDebug("Listing {SourceId} already scraped on {ScrapingDate}, availability and rooms skipped", candidate.SourceId, scrapingDate);
                     continue;
                 }
@@ -178,6 +186,7 @@ namespace Toeristenscraper.Scraper.Storage
                         };
                         foreach (string amenity in room.Amenities)
                         {
+                            newRoomAmenities += 1;
                             roomRow.AccommodationRoomAmenities.Add(new AccommodationRoomAmenity { AmenityValue = amenity, ScrapingDate = scrapingDate });
                         }
                         db.AccommodationRoom.Add(roomRow);
@@ -192,11 +201,13 @@ namespace Toeristenscraper.Scraper.Storage
                 {
                     foreach (string amenity in currentAmenities)
                     {
+                        newAmenities += 1;
                         db.AccommodationAmenity.Add(new AccommodationAmenity { AccommodationListing = listing, AmenityValue = amenity, ScrapingDate = scrapingDate });
                     }
                     newAmenitySets += 1;
                 }
 
+                int rowsBefore = availabilityRows.Count;
                 // beschikbaarheid: dagen zonder datum, beschikbaarheid of minimaal aantal nachten kunnen niet opgeslagen worden (verplichte kolommen)
                 foreach (Availability day in item.Availability)
                 {
@@ -215,6 +226,10 @@ namespace Toeristenscraper.Scraper.Storage
                         ScrapingDate = scrapingDate
                     });
                 }
+                if (availabilityRows.Count > rowsBefore)
+                {
+                    listingsWithAvailability += 1;
+                }
             }
             db.AccommodationAvailability.AddRange(availabilityRows);
             try
@@ -225,9 +240,22 @@ namespace Toeristenscraper.Scraper.Storage
             {
                 db.ChangeTracker.Clear();
             }
-            logger.LogDebug("Batch saved: {Accommodations} accommodations, {NewListings} new listing versions, {NewReviews} new reviews, {newRooms} new rooms, {newAmenitySets} new amenity sets, {Rows} availability rows",
-               batch.Count, newListings, newReviews, newRooms, newAmenitySets, availabilityRows.Count);     
+            logger.LogDebug("Batch saved: {Accommodations} accommodations, {NewListings} new or changed listings, {NewRooms} rooms ({NewRoomAmenities} room amenities), {NewReviews} new or changed reviews, {NewAmenitySets} listings with new or changed amenities ({NewAmenities} amenities), {Rows} availability days",
+                batch.Count, newListings, newRooms, newRoomAmenities, newReviews, newAmenitySets, newAmenities, availabilityRows.Count);
+
+            // opgeslagen aantallen van deze batch optellen bij de statistieken van het platform
+            stats.NewListingVersions += newListings;
+            stats.UnchangedListings += unchangedListings;
+            stats.SkippedAlreadyScraped += skippedAlreadyScraped;
+            stats.NewReviews += newReviews;
+            stats.NewRooms += newRooms;
+            stats.NewAmenitySets += newAmenitySets;
+            stats.NewAmenities += newAmenities;
+            stats.NewRoomAmenities += newRoomAmenities;
+            stats.AvailabilityRows += availabilityRows.Count;
+            stats.ListingsWithAvailability += listingsWithAvailability;
         }
+
 
         private static AccommodationListing MapListing(ScrapedAccommodation item, int platformId, LocalityBoundary? region, AccommodationEstablishment? establishment, DateOnly scrapingDate)
         {
