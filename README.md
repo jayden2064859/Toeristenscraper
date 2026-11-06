@@ -58,6 +58,8 @@ Een kamer-record in AccommodationRoom zonder SourceRoomId is een accommodatie zo
 
 Een kamer-record in AccommodationRoom die geen prijs bevat (TotalPrice null) is een kamer die op de aankomstdatum van de scrape niet beschikbaar voor boeking was.
 
+De toeristenbelasting verschilt per gemeente. In Amsterdam is het 12,5% van de overnachtingsprijs, in veel andere gemeenten een vast bedrag per persoon per nacht (vaak tussen 2 en 3 euro). Bij Booking.com wordt alleen de regel toeristenbelasting opgeslagen als TaxAmount. Bij Airbnb komt TaxAmount uit de regel “Belastingen”. Uit controle van de opgeslagen data bleek dat die bij een deel van de listings ook BTW bevat (bijvoorbeeld 12,5% toeristenbelasting + 21% BTW). Hierdoor kan TaxAmount bij Airbnb soms hoger zijn dan alleen de toeristenbelasting.
+
 ## Foutafhandeling
 Elke operatie heeft een eigen Polly-pipeline. Bij een 5xx-fout, een netwerkfout of een timeout wordt de request opnieuw geprobeerd. Bij een 429 (te veel requests) wordt eerst gewacht en dan opnieuw geprobeerd. Blijft het platform 429 teruggeven, dan opent de circuit breaker en stopt het scrapen voor dat platform. Bij een 404 stopt het platform ook, omdat de operatie dan waarschijnlijk niet meer bestaat.
 
