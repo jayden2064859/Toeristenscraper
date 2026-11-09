@@ -14,20 +14,25 @@
         {
             get
             {
-                // totalen over alle platforms
-                int dutchListings = 0;
-                int failedListings = 0;
+                int failedPlatforms = 0;
+                bool errorOccurred = false;
                 foreach (PlatformRunStats platform in Platforms)
                 {
-                    dutchListings += platform.Dutch;
-                    failedListings += platform.FailedListings;
+                    if (platform.IsFailed)
+                    {
+                        failedPlatforms += 1;
+                    }
+                    if (platform.FailedTiles > 0 || platform.FailedListings > 0)
+                    {
+                        errorOccurred = true;
+                    }
                 }
 
-                if (StoppedPlatforms.Count == Platforms.Count || (dutchListings > 0 && failedListings == dutchListings))
+                if (failedPlatforms == Platforms.Count)
                 {
-                    return "Failed"; // geen enkel platform heeft de run afgemaakt, of alle listings zijn mislukt
+                    return "Failed";
                 }
-                if (StoppedPlatforms.Count > 0 || FailedTiles.Count > 0 || failedListings > 0)
+                if (failedPlatforms > 0 || errorOccurred)
                 {
                     return "PartiallyFailed";
                 }
@@ -38,12 +43,24 @@
         // method die aan het einde van een scraperun de statestieken van de hele run logt
         public void LogSummary(ILogger logger)
         {
-            logger.LogInformation("\nScrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
+            if (Status == "Failed")
+            {
+                logger.LogError("Scrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
+            }
+            else if (Status == "PartiallyFailed")
+            {
+                logger.LogWarning("Scrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
+            }
+            else
+            {
+                logger.LogInformation("Scrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
+            }
+
 
             foreach (PlatformRunStats p in Platforms)
             {
                 logger.LogInformation(
-                    "\n{Platform}" +
+                    "{Platform}" +
                     "\n  Scraping" +
                     "\n    Discovery     {Found} found in {Areas} area(s), {Duplicates} duplicates -> {Unique} unique" +
                     "\n    Filtering     {Foreign} foreign -> {Dutch} Dutch" +
@@ -57,7 +74,7 @@
                     p.PlatformName,
                     p.FoundListings, p.AreaCount, p.Duplicates, p.UniqueListings,
                     p.ForeignListings, p.Dutch,
-                    p.Processed, p.FailedListings,
+                    p.ProcessedListings, p.FailedListings,
                     p.NewListingVersions, p.UnchangedListings, p.SkippedAlreadyScraped,
                     p.NewRooms, p.NewRoomAmenities,
                     p.NewReviews,
@@ -75,7 +92,7 @@
             {
                 tiles = string.Join(", ", FailedTiles);
             }
-            logger.LogInformation("\nStopped platforms: {Stopped}\nFailed tiles: {FailedTiles}", stopped, tiles);
+            logger.LogInformation("Stopped platforms: {Stopped}\nFailed tiles: {FailedTiles}", stopped, tiles);
         }
     }
 }

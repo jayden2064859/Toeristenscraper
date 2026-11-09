@@ -20,10 +20,7 @@ namespace Toeristenscraper.Scraper
                 await Task.Delay(delay, ct);
                 await RunScrapeAsync(ct);
             }
-
-
         }
-
 
         private async Task RunScrapeAsync(CancellationToken ct)
         {
@@ -63,7 +60,7 @@ namespace Toeristenscraper.Scraper
             }
             TimeSpan delay = nextRun - now;
 
-            logger.LogInformation("Next scraperun starts at {NextRun}", nextRun);
+            logger.LogInformation("Next scraperun starts at {NextRun:yyyy-MM-dd HH:mm}", nextRun);
             return delay;
         }
     }

@@ -16,6 +16,7 @@ namespace Toeristenscraper.Scraper.Orchestration
     {
         public async Task RunAsync(CancellationToken ct)
         {
+
             // start van de run: elke run krijgt een run-id, en een starttijd (voor logging van scrapes)
             Guid runId = Guid.NewGuid();
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -23,14 +24,19 @@ namespace Toeristenscraper.Scraper.Orchestration
             DateOnly scrapingDate = DateOnly.FromDateTime(DateTime.Today);
             ScraperunReport report = new ScraperunReport { RunId = runId, StartTime = DateTime.Now, ScrapingDate = scrapingDate };
 
+            // run-id aan elke log toevoegen zodat in Wazuh alle logs op run-id gefiltered kan worden
+            using IDisposable? runScope = logger.BeginScope(new Dictionary<string, object> { ["RunId"] = runId });
 
-            logger.LogInformation("\nScrape-run {RunId} started at {StartTime}\n", runId, DateTime.Now);
+
+            logger.LogInformation("Scrape-run {RunId} started at {StartTime:yyyy-MM-dd HH:mm:ss}", runId, report.StartTime);
 
             foreach (IAccommodationSource source in sources)
             {
-                PlatformRunStats stats = new PlatformRunStats { PlatformName = source.PlatformName, AreaCount = options.Value.Areas.Count };
-                report.Platforms.Add(stats);
-                logger.LogInformation("\n{Platform}: scraping started ({Areas} area(s))", source.PlatformName, options.Value.Areas.Count);
+                // platformnaam aan elke log tijdens de platform-run toevoegen
+                using IDisposable? platformScope = logger.BeginScope(new Dictionary<string, object> { ["Platform"] = source.PlatformName });
+                PlatformRunStats platformStats = new PlatformRunStats { PlatformName = source.PlatformName, AreaCount = options.Value.Areas.Count };
+                report.Platforms.Add(platformStats);
+                logger.LogInformation("{Platform}: scraping started ({Areas} area(s))", source.PlatformName, options.Value.Areas.Count);
 
                 try
                 {
@@ -54,6 +60,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                         platformResults.AddRange(accommodations);
                         foreach (Tile failedTile in areaFailedTiles)
                         {
+                            platformStats.FailedTiles += 1;
                             report.FailedTiles.Add($"{source.PlatformName}/{area.Name}/{failedTile.Name}");
                         }
                     }
@@ -62,8 +69,11 @@ namespace Toeristenscraper.Scraper.Orchestration
                     List<DiscoveredAccommodation> deduplicatedList = platformResults.DistinctBy(accommodation => accommodation.SourceId).ToList();
 
                     // aantallen vastleggen voor de samenvatting aan het einde van de run
-                    stats.FoundListings = platformResults.Count;
-                    stats.UniqueListings = deduplicatedList.Count;
+                    platformStats.FoundListings = platformResults.Count;
+                    platformStats.UniqueListings = deduplicatedList.Count;
+
+                    // variabele om het aantal opeenvolgend falende requests bij te houden. wanneer het aantal even groot is als de configureerde max consecutive failed requests in de configuratie, stopt het platform met scrapen
+                    int consecutiveFailures = 0;
 
                     // detailoperaties per listing: een mislukte listing wordt overgeslagen, zodat de rest van de run doorgaat 
                     foreach (DiscoveredAccommodation listing in deduplicatedList)
@@ -73,7 +83,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                         {
                             if (!string.Equals(listing.CountryCode, "nl", StringComparison.OrdinalIgnoreCase))
                             {
-                                stats.ForeignListings += 1;
+                                platformStats.ForeignListings += 1;
                                 continue;
                             }
                         }
@@ -83,7 +93,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                             bool isDutchListing = await dbWriter.IsDutchListingAsync(listing.Latitude, listing.Longitude, ct);
                             if (!isDutchListing)
                             {
-                                stats.ForeignListings += 1;
+                                platformStats.ForeignListings += 1;
                                 continue;
                             }
                         }
@@ -99,11 +109,12 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                             if (batch.Count == WriteToDb.BatchSize) 
                             {
-                                stats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, stats, ct);
+                                platformStats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
                             }
+                            consecutiveFailures = 0;
                         }
                         catch (BrokenCircuitException)
-                        {                         
+                        {
                             throw;
                         }
                         catch (Exception ex)
@@ -113,30 +124,54 @@ namespace Toeristenscraper.Scraper.Orchestration
                                 throw; // platform stopt met scrapen bij een 404 (not found)
                             }
                             if (ex is OutdatedHashException || ex is BlockedException) 
-                            { 
+                            {
                                 throw; 
                             }
                             if (IsDatabaseUnavailable(ex)) // database wordt 5x opnieuw geprobeerd (config in program.cs) daarna stopt het platform met scrapen
                             {
                                 throw;
                             }
-                            logger.LogWarning(ex, "Listing {SourceId} on {Platform} skipped", listing.SourceId, source.PlatformName);
-                            stats.FailedListings += 1;
+                            if (ex is HttpRequestException)
+                            {
+                                logger.LogWarning("Listing {SourceId} on {Platform} skipped: {Error}", listing.SourceId, source.PlatformName, ex.Message);
+                            }
+                            else
+                            {
+                                logger.LogWarning(ex, "Listing {SourceId} on {Platform} skipped (unexpected error)", listing.SourceId, source.PlatformName);
+                            }
+                            platformStats.FailedListings += 1;
+                            consecutiveFailures += 1;
+                            
+                            if (consecutiveFailures >= options.Value.Resilience.MaxConsecutiveFailures)
+                            {
+                                throw new MaxConsecutiveFailuresException("Number of consecutive failed listings reached the configured maximum (" + options.Value.Resilience.MaxConsecutiveFailures + ")");
+                            }
                         }
                     }
-                    // laatste batch wegschrijven
-                    stats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, stats, ct);
+                    // laatste batch wegschrijven. het return type van SaveBatchAsync is het aantal gefaalde listings voor het platform waarvoor weggeschreven wordt
+                    platformStats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
 
                 }
-                catch (BrokenCircuitException ex)  // loggen wanneer circuit geopent is (run gestopt for specifiek platform)
+                catch (BrokenCircuitException)  // loggen wanneer circuit geopent is (run gestopt for specifiek platform)
                 {
+                    platformStats.Stopped = true;
                     report.StoppedPlatforms.Add($"{source.PlatformName} (circuit open)");
-                    logger.LogError(ex, "Scrape-run {RunId}: circuit opened for {Platform}, platform stopped for this run", runId, source.PlatformName);
+                    logger.LogError("Scrape-run {RunId}: circuit opened for {Platform}, platform stopped for this run", runId, source.PlatformName);
                 }
                 catch (Exception ex) 
                 {
+                    platformStats.Stopped = true;
                     report.StoppedPlatforms.Add($"{source.PlatformName} ({ex.GetType().Name})");
-                    logger.LogError(ex, "Scrape-run {RunId}: error occurred on {Platform}", runId, source.PlatformName);
+
+                    // verwachte fouten: melding is genoeg, geen stacktrace nodig
+                    if (IsDatabaseUnavailable(ex) || ex is BlockedException || ex is OutdatedHashException || ex is HttpRequestException || ex is MaxConsecutiveFailuresException)
+                    {
+                        logger.LogError("Scrape-run {RunId}: {Platform} stopped: {Error}", runId, source.PlatformName, ex.Message);
+                    }
+                    else
+                    {
+                        logger.LogError(ex, "Scrape-run {RunId}: unexpected error on {Platform}", runId, source.PlatformName);
+                    }
                 }
             }
             // einde run: eindtijd en totale duur van de scraperun loggen.
@@ -146,18 +181,19 @@ namespace Toeristenscraper.Scraper.Orchestration
         }
 
         // helper method die de WriteBatchAsync methode aanroept om een batch op te slaan naar de database. de helper method geeft het aantal mislukte weggeschreven listings terug
-        private async Task<int> SaveBatchAsync(WriteToDb dbWriter, IAccommodationSource source, DateOnly scrapingDate, List<ScrapedAccommodation> batch, PlatformRunStats stats, CancellationToken ct)
+        private async Task<int> SaveBatchAsync(WriteToDb dbWriter, IAccommodationSource source, DateOnly scrapingDate, List<ScrapedAccommodation> batch, PlatformRunStats platformStats, CancellationToken ct)
         {
             int failed = 0;
             try
             {
-                await dbWriter.WriteBatchAsync(source.PlatformId, scrapingDate, batch, stats, ct);
+                await dbWriter.WriteBatchAsync(source.PlatformId, scrapingDate, batch, platformStats, ct);
+                platformStats.ProcessedListings += batch.Count;
+
             }
             catch (Exception ex)
             {
                 if (IsDatabaseUnavailable(ex))
                 {
-                    logger.LogError(ex, "Database unavailable, batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.InnerException?.Message ?? ex.Message);
                     throw;
                 }
                 logger.LogError(ex, "Batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.InnerException?.Message ?? ex.Message);
@@ -173,7 +209,13 @@ namespace Toeristenscraper.Scraper.Orchestration
             Exception? current = ex;
             while (current != null)
             {
+                // transiente (tijdelijke) fouten
                 if (current is NpgsqlException npgsqlException && npgsqlException.IsTransient)
+                {
+                    return true;
+                }
+                // niet-transiente fouten (bijv verkeerd wachtwoord, 28P01) wordt ook opgevangen
+                if (current is PostgresException postgresException && postgresException.SqlState.StartsWith("28"))
                 {
                     return true;
                 }

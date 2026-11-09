@@ -24,7 +24,7 @@ namespace Toeristenscraper.Scraper.Transport
                     new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 30000 });
 
                 IReadOnlyList<BrowserContextCookiesResult> cookies = await page.Context.CookiesAsync();
-                var awsWafToken = cookies
+                string? awsWafToken = cookies
                 .FirstOrDefault(c => c.Name == "aws-waf-token")
                 ?.Value;
 
@@ -33,7 +33,7 @@ namespace Toeristenscraper.Scraper.Transport
                     throw new BlockedException("Booking.com: aws-waf-token not found after Playwright session");
                 }
                 Cookie = awsWafToken;
-                logger.LogWarning("\nBooking.com: aws-waf-token refreshed");
+                logger.LogInformation("Booking.com: aws-waf-token refreshed");
             }
             catch (PlaywrightException ex)
             {

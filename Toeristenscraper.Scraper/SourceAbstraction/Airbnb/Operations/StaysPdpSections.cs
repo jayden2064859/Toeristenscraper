@@ -26,7 +26,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations
                 // sourceId variaties en persisted query hash
                 .Replace("{{stayListingId}}", stayListingId)
                 .Replace("{{demandStayListingId}}", demandStayListingId)
-                .Replace("{{hash}}", options.Value.Airbnb.StaysPdpSectionsHash)
+                .Replace("{{hash}}", hashProvider.Hash)
 
                 // zoekparameters
                 .Replace("{{checkIn}}", checkIn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))

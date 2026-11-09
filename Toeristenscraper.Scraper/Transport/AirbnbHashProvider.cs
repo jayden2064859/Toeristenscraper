@@ -10,6 +10,8 @@ namespace Toeristenscraper.Scraper.Transport
     // wanneer een ongeldige hash mee wordt gegeven in de request wordt error 400 teruggegeven met PersistedQueryNotFound
     public class AirbnbHashProvider(IOptions<ScraperOptions> options, ILogger<AirbnbHashProvider> logger)
     {
+        // actuele hash (startwaarde uit appsettings), wordt vernieuwd met Playwright als hij verlopen is
+        public string Hash { get; private set; } = options.Value.Airbnb.StaysPdpSectionsHash;
 
         public async Task RefreshAsync(string sourceId)
         {
@@ -28,14 +30,12 @@ namespace Toeristenscraper.Scraper.Transport
                 // de hash is het laatste deel van het pad: /api/v3/StaysPdpSections/<hash>
                 string newHash = new Uri(request.Url).Segments.Last();
                 
-                if (newHash == options.Value.Airbnb.StaysPdpSectionsHash)
+                if (newHash == Hash)
                 {
                     throw new OutdatedHashException("StaysPdpSections: Playwright found the same outdated hash, refresh failed");
-                }
-                // de hash in options (ingelezen uit appsettings.json) wordt in het geheugen bijgewerkt, zodat StaysPdpSections de nieuwe hash gebruikt.
-                // het bestand appsettings.json zelf verandert niet: na een herstart wordt de hash zo nodig opnieuw vernieuwd
-                options.Value.Airbnb.StaysPdpSectionsHash = newHash;
-                logger.LogWarning("StaysPdpSections: persisted query hash refreshed to {Hash}", newHash);
+                }        
+                Hash = newHash;
+                logger.LogWarning("StaysPdpSections: persisted query hash refreshed");
             }
             catch (PlaywrightException ex)
             {

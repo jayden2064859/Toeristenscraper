@@ -52,7 +52,14 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                         throw;
                     }
 
-                    logger.LogWarning(ex, "Tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped", area.Name, tile.Name, tile.Depth, source.PlatformName);
+                    if (ex is HttpRequestException)
+                    {
+                        logger.LogWarning("Tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped: {Error}", area.Name, tile.Name, tile.Depth, source.PlatformName, ex.Message);
+                    }
+                    else
+                    {
+                        logger.LogWarning(ex, "Tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped (unexpected error)", area.Name, tile.Name, tile.Depth, source.PlatformName);
+                    }
                     failedTiles.Add(tile);
                     continue;   // door met de volgende tegel in de queue
                 }
