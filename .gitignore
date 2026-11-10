@@ -8,3 +8,9 @@ obj/
 
 # visual Studio
 .vs/
+
+# serilog folder (alleen development)
+logs/
+
+# efbundle (migrations bundle)
+efbundle

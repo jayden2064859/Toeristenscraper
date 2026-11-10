@@ -18,9 +18,8 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
             JsonElement rootQuery = GetJsonElementHelper.Get(root, "ROOT_QUERY")
                 ?? throw new InvalidOperationException("Booking.com HTML: missing ROOT_QUERY in Apollo data");
 
-            // bevat de prijzen per aanbieding en de voorzieningen per kamer
-            JsonElement roomDetail = FindByPrefix(rootQuery, "roomDetail(")
-                ?? throw new InvalidOperationException("Booking.com HTML: missing roomDetail in Apollo data");
+            // bevat de prijzen per aanbieding en de voorzieningen per kamer, ontbreekt als de accommodatie op de zoekdatums volgeboekt is
+            JsonElement? roomDetail = FindByPrefix(rootQuery, "roomDetail(");
 
             // bevat de kamers, voorzieningen van de accommodatie, KVK- en registratienummer
             JsonElement property = FindByPrefix(root, "Property:")
@@ -51,7 +50,13 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                     BedInfo beds = ParseBeds(root, room);
 
                     // een kamer zonder aanbieding is op de zoekdatums niet beschikbaar, de prijs blijft dan null
-                    PriceInfo price = ParseCheapestOffer(root, roomDetail, roomId);
+                    PriceInfo price = new PriceInfo(null, null, null);
+                    List<string> roomAmenities = new List<string>();
+                    if (roomDetail != null)
+                    {
+                        price = ParseCheapestOffer(root, roomDetail.Value, roomId);
+                        roomAmenities = ParseRoomAmenities(root, roomDetail.Value, roomId);
+                    }
 
                     rooms.Add(new RoomDetails
                     {
@@ -64,7 +69,7 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                         TotalPrice = price.TotalPrice,
                         TaxIncluded = price.TaxIncluded,
                         TaxAmount = price.TaxAmount,
-                        Amenities = ParseRoomAmenities(root, roomDetail, roomId)
+                        Amenities = roomAmenities
                     });
                 }
             }

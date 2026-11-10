@@ -22,6 +22,7 @@ Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger()
 try
 {
     var builder = Host.CreateApplicationBuilder(args);
+    builder.Services.AddSystemd();
 
     // connection naar Azure Key Vault (voor productie)
     if (builder.Environment.IsProduction())

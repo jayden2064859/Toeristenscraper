@@ -3,7 +3,7 @@
        image: timescale/timescaledb-ha:pg17
        container_name: toeristenscraper-db
        ports:
-         - "5433:5432"
+         - "127.0.0.1:5433:5432"
        environment:
          POSTGRES_USER: postgres
          POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
