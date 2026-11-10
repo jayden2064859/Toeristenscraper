@@ -19,7 +19,9 @@ Daarna worden alleen Nederlandse listings verder verwerkt. Booking.com geeft per
 ## Detailoperaties
 Per listing worden de beschikbaarheid en de details opgehaald. Mislukt dit voor één listing, dan wordt in de meeste gevallen alleen die listing overgeslagen (zie Foutafhandeling).
 
-Booking.com haalt de beschikbaarheid een jaar vooruit op met AvailabilityCalendar, in requests van 61 dagen. De details van Booking.com zijn nog niet uitgewerkt. GetDetailsAsync geeft daar voorlopig lege details terug.
+Booking.com haalt de beschikbaarheid een jaar vooruit op met AvailabilityCalendar, in requests van 61 dagen. De details komen uit de Apollo-JSON in de HTML-pagina van de listing, met de zoekparameters als query string. Voor deze pagina is een aws-waf-token nodig. BookingCookieProvider haalt dit token op met Playwright en vernieuwt het bij een challenge (HTTP 202). Zonder browser-User-Agent behandelt Booking.com de request als robot en geeft het geen prijzen.
+
+Per kamer worden de laagste totaalprijs (met de toeristenbelasting als TaxAmount), de bedden en de voorzieningen opgeslagen. Een kamer zonder aanbieding is niet beschikbaar en krijgt geen prijs. De voorzieningen van de hele accommodatie zijn onvolledig, omdat Booking.com de volledige lijst pas bij het scrollen laadt. Het KVK-nummer wordt alleen opgeslagen als het uit 8 cijfers bestaat.
 
 Airbnb haalt de beschikbaarheid op met PdpAvailabilityCalendar: 12 kalendermaanden vanaf de huidige maand in één request. Dagen vóór de scrapedatum worden overgeslagen. De details komen uit StaysPdpSections (een persisted query): accommodatietype, exacte locatie, reviews, Superhost, KVK-nummer, registratienummer, voorzieningen, kamers en prijzen.
 
@@ -88,7 +90,6 @@ docker run --rm ghcr.io/osgeo/gdal:ubuntu-small-latest ogr2ogr -f PostgreSQL "PG
 De BAG-velden worden zo gekoppeld: woonplaats wordt city, bronhouder_naam wordt municipality en provincie_naam wordt province. Na de import bevat de tabel ongeveer 2500 woonplaatsen. De import wordt bij voorkeur jaarlijks opnieuw uitgevoerd, omdat gemeentelijke herindelingen meestal op 1 januari ingaan.
 
 ## To do
-- Logging via Serilog naar Azure Blob Storage, uitgelezen door Wazuh, en een alert naar de systeembeheerder wanneer een platform stopt
 - Analyse-component
 - Presentatielaag
 - Unit- en integratietests (xUnit)
