@@ -9,7 +9,7 @@ using Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations;
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb
 {
     public class AirbnbSource(StaysSearch staysSearch, PdpAvailabilityCalendar pdpAvailabilityCalendar, StaysPdpSections staysPdpSections, 
-                                IOptions<ScraperOptions> options, ILogger<AirbnbSource> logger) : IAccommodationSource
+                                IOptions<ScraperOptions> options) : IAccommodationSource
     {
         public string PlatformName { get; } = "Airbnb";
         public int PlatformId { get; } = 2;
