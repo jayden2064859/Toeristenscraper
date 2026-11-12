@@ -5,6 +5,7 @@
 # .NET build output
 bin/
 obj/
+publish/
 
 # visual Studio
 .vs/
