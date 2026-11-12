@@ -8,7 +8,8 @@ using Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations;
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 {
     // implementeert IAccommodationSource: eerst pagina 1, bij >1000 resultaten meteen “limiet bereikt”, anders de overige pagina’s ophalen via offset
-    public class BookingSource(FullSearch fullSearch, AvailabilityCalendar availabilityCalendar, HTML html, IOptions<ScraperOptions> options, ILogger<BookingSource> logger) : IAccommodationSource
+    public class BookingSource(FullSearch fullSearch, AvailabilityCalendar availabilityCalendar,
+                                HTML html, IOptions<ScraperOptions> options, ILogger<BookingSource> logger) : IAccommodationSource
     {
         public string PlatformName { get; } = "Booking.com";
         public int PlatformId { get; } = 1;

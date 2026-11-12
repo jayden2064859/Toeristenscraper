@@ -4,6 +4,7 @@
     <File Path=".gitignore" />
     <File Path="docker-compose.yml" />
   </Folder>
+  <Project Path="Toeristenscraper.Analytics/Toeristenscraper.Analytics.csproj" Id="b223660d-575d-49bb-8cac-366dd10f05a4" />
   <Project Path="Toeristenscraper.Data/Toeristenscraper.Data.csproj" />
   <Project Path="Toeristenscraper.Scraper/Toeristenscraper.Scraper.csproj" />
   <Project Path="Toeristenscraper.Web/Toeristenscraper.Web.csproj" />

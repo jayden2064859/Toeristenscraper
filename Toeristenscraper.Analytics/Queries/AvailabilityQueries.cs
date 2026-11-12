@@ -38,18 +38,25 @@ namespace Toeristenscraper.Analytics.Queries
             }
 
             // 2. per accommodatie en datum alleen de meest recente observatie
-            IQueryable<LatestObservation> latestObservations = query
-                .GroupBy(a => new { a.AccommodationListing.PlatformId, a.AccommodationListing.SourceId, a.AvailabilityDate })
-                .Select(g => g.OrderByDescending(a => a.ScrapingDate).First())
-                .Select(a => new LatestObservation(
-                    a.AccommodationListing.PlatformId,
-                    a.AccommodationListing.SourceId,
-                    a.AvailabilityDate,
-                    a.IsAvailable,
-                    a.AccommodationListing.City,
-                    a.AccommodationListing.Municipality,
-                    a.AccommodationListing.Province,
-                    a.AccommodationListing.AccommodationType));
+            IQueryable<AccommodationAvailability> latest = query.Where(a => !dbContext.AccommodationAvailability.Any(b =>
+                b.AccommodationListing.PlatformId == a.AccommodationListing.PlatformId &&
+                b.AccommodationListing.SourceId == a.AccommodationListing.SourceId &&
+                b.AvailabilityDate == a.AvailabilityDate &&
+                b.ScrapingDate > a.ScrapingDate &&
+                b.ScrapingDate <= filter.referenceDate));
+
+            IQueryable<LatestObservation> latestObservations = latest.Select(a => new LatestObservation
+            {
+                platformId = a.AccommodationListing.PlatformId,
+                sourceId = a.AccommodationListing.SourceId,
+                availabilityDate = a.AvailabilityDate,
+                isAvailable = a.IsAvailable,
+                city = a.AccommodationListing.City,
+                municipality = a.AccommodationListing.Municipality,
+                province = a.AccommodationListing.Province,
+                accommodationType = a.AccommodationListing.AccommodationType,
+                scrapingDate = a.ScrapingDate
+            });
             return latestObservations;
 
         }

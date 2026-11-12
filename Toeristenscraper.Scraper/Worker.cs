@@ -24,7 +24,7 @@ namespace Toeristenscraper.Scraper
 
         private async Task RunScrapeAsync(CancellationToken ct)
         {
-            // per run een nieuwe scope, zodat de orchestrator (en straks de DbContext) steeds een nieuwe instantie is
+            // per run een nieuwe scope, zodat de orchestrator (en DbContext) elke run een nieuwe instantie is
             await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
             ScrapeOrchestrator orchestrator = scope.ServiceProvider.GetRequiredService<ScrapeOrchestrator>();
 
