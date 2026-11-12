@@ -35,7 +35,7 @@ namespace Toeristenscraper.Scraper.Transport
                     throw new OutdatedHashException("StaysPdpSections: Playwright found the same outdated hash, refresh failed");
                 }        
                 Hash = newHash;
-                logger.LogWarning("StaysPdpSections: persisted query hash refreshed");
+                logger.LogInformation("StaysPdpSections: persisted query hash refreshed");
             }
             catch (PlaywrightException ex)
             {

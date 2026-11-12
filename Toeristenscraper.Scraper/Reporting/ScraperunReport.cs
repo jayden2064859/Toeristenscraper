@@ -6,10 +6,6 @@
         public DateTime StartTime { get; set; }
         public TimeSpan Duration { get; set; }
         public List<PlatformRunStats> Platforms { get; set; } = new List<PlatformRunStats>();
-        public List<string> StoppedPlatforms { get; set; } = new List<string>();
-        public List<string> FailedTiles { get; set; } = new List<string>();
-        public DateOnly ScrapingDate { get; set; }
-
         public string Status
         {
             get
@@ -22,7 +18,7 @@
                     {
                         failedPlatforms += 1;
                     }
-                    if (platform.FailedTiles > 0 || platform.FailedListings > 0)
+                    if (platform.FailedTilesCount > 0 || platform.FailedListingsCount > 0)
                     {
                         errorOccurred = true;
                     }
@@ -40,7 +36,6 @@
             }
         }
 
-        // method die aan het einde van een scraperun de statestieken van de hele run logt
         public void LogSummary(ILogger logger)
         {
             if (Status == "Failed")
@@ -56,41 +51,30 @@
                 logger.LogInformation("Scrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
             }
 
-
-            foreach (PlatformRunStats p in Platforms)
+            // gestopte platforms en mislukte tegels worden afgeleid uit de stats per platform
+            List<string> stoppedPlatforms = new List<string>();
+            List<string> failedTiles = new List<string>();
+            foreach (PlatformRunStats platform in Platforms)
             {
-                logger.LogInformation(
-                    "{Platform}" +
-                    "\n  Scraping" +
-                    "\n    Discovery     {Found} found in {Areas} area(s), {Duplicates} duplicates -> {Unique} unique" +
-                    "\n    Filtering     {Foreign} foreign -> {Dutch} Dutch" +
-                    "\n    Retrieved     {Processed} listings with availability, rooms and prices ({Failed} failed)" +
-                    "\n  Saved to database" +
-                    "\n    Listings      {NewVersions} new or changed, {Unchanged} unchanged, {SkippedToday} already scraped today" +
-                    "\n    Rooms         {Rooms} rooms ({RoomAmenities} room amenities)" +
-                    "\n    Reviews       {Reviews} new or changed" +
-                    "\n    Amenities     {AmenitySets} listings with new or changed amenities ({Amenities} amenities)" +
-                    "\n    Availability  {Rows} days for {AvailabilityListings} listings, compressed from {CompressionDate}",
-                    p.PlatformName,
-                    p.FoundListings, p.AreaCount, p.Duplicates, p.UniqueListings,
-                    p.ForeignListings, p.Dutch,
-                    p.ProcessedListings, p.FailedListings,
-                    p.NewListingVersions, p.UnchangedListings, p.SkippedAlreadyScraped,
-                    p.NewRooms, p.NewRoomAmenities,
-                    p.NewReviews,
-                    p.NewAmenitySets, p.NewAmenities,
-                    p.AvailabilityRows, p.ListingsWithAvailability, ScrapingDate.AddDays(2).ToString("yyyy-MM-dd"));
+                if (platform.Stopped)
+                {
+                    stoppedPlatforms.Add(platform.PlatformName + " (" + platform.StopReason + ")");
+                }
+                foreach (string tileName in platform.FailedTileNames)
+                {
+                    failedTiles.Add(platform.PlatformName + "/" + tileName);
+                }
             }
 
             string stopped = "None";
-            if (StoppedPlatforms.Count > 0)
+            if (stoppedPlatforms.Count > 0)
             {
-                stopped = string.Join(", ", StoppedPlatforms);
+                stopped = string.Join(", ", stoppedPlatforms);
             }
             string tiles = "None";
-            if (FailedTiles.Count > 0)
+            if (failedTiles.Count > 0)
             {
-                tiles = string.Join(", ", FailedTiles);
+                tiles = string.Join(", ", failedTiles);
             }
             logger.LogInformation("Stopped platforms: {Stopped}\nFailed tiles: {FailedTiles}", stopped, tiles);
         }

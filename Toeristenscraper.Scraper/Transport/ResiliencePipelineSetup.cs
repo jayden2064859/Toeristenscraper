@@ -28,15 +28,15 @@ namespace Toeristenscraper.Scraper.Transport
                 .HandleResult(response => response.StatusCode == HttpStatusCode.TooManyRequests);
             pipelineBuilder.AddRetry(rateLimitRetry);
 
-
+            
             // retry bij tijdelijke fouten
             var transientErrorsRetry = new HttpRetryStrategyOptions();
             transientErrorsRetry.Name = "TransientRetry";
             transientErrorsRetry.MaxRetryAttempts = settings.MaxRetries;
             transientErrorsRetry.Delay = TimeSpan.FromSeconds(settings.RetryDelaySeconds);
             transientErrorsRetry.ShouldRetryAfterHeader = false;
-            transientErrorsRetry.BackoffType = DelayBackoffType.Constant;
-            transientErrorsRetry.UseJitter = false;
+            transientErrorsRetry.BackoffType = DelayBackoffType.Exponential; // exponentiele backoff (eerste retry 2 sec, tweede retry 4 sec, derde retry 8 sec, etc) 
+            transientErrorsRetry.UseJitter = true;
 
             transientErrorsRetry.ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
                 .HandleResult(response => (int)response.StatusCode >= 500) // alle 5xx fouten

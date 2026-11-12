@@ -243,16 +243,16 @@ namespace Toeristenscraper.Scraper.Storage
                 batch.Count, newListings, newRooms, newRoomAmenities, newReviews, newAmenitySets, newAmenities, availabilityRows.Count);
 
             // opgeslagen aantallen van deze batch optellen bij de statistieken van het platform
-            stats.NewListingVersions += newListings;
-            stats.UnchangedListings += unchangedListings;
-            stats.SkippedAlreadyScraped += skippedAlreadyScraped;
-            stats.NewReviews += newReviews;
-            stats.NewRooms += newRooms;
-            stats.NewAmenitySets += newAmenitySets;
-            stats.NewAmenities += newAmenities;
-            stats.NewRoomAmenities += newRoomAmenities;
-            stats.AvailabilityRows += availabilityRows.Count;
-            stats.ListingsWithAvailability += listingsWithAvailability;
+            stats.NewListingVersionsCount += newListings;
+            stats.UnchangedListingsCount += unchangedListings;
+            stats.SkippedAlreadyScrapedCount += skippedAlreadyScraped;
+            stats.NewReviewsCount += newReviews;
+            stats.NewRoomsCount += newRooms;
+            stats.NewAmenitySetsCount += newAmenitySets;
+            stats.NewAmenitiesCount += newAmenities;
+            stats.NewRoomAmenitiesCount += newRoomAmenities;
+            stats.AvailabilityRowsCount += availabilityRows.Count;
+            stats.ListingsWithAvailabilityCount += listingsWithAvailability;
         }
 
 

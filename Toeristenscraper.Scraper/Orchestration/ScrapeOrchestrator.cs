@@ -3,6 +3,7 @@ using Npgsql;
 using Polly.CircuitBreaker;
 using System.Diagnostics;
 using System.Net;
+using System.Reflection;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Reporting;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
@@ -19,19 +20,28 @@ namespace Toeristenscraper.Scraper.Orchestration
 
             // start van de run: elke run krijgt een run-id, en een starttijd (voor logging van scrapes)
             Guid runId = Guid.NewGuid();
-            Stopwatch stopwatch = Stopwatch.StartNew();
+            // stopwatch die de gehele scrape-run duration bijhoudt (alle platforms samen)
+            Stopwatch scrapeRunStopwatch = Stopwatch.StartNew();
 
             DateOnly scrapingDate = DateOnly.FromDateTime(DateTime.Today);
-            ScraperunReport report = new ScraperunReport { RunId = runId, StartTime = DateTime.Now, ScrapingDate = scrapingDate };
+            ScraperunReport report = new ScraperunReport { RunId = runId, StartTime = DateTime.Now };
 
             // run-id aan elke log toevoegen zodat in Wazuh alle logs op run-id gefiltered kan worden
             using IDisposable? runScope = logger.BeginScope(new Dictionary<string, object> { ["RunId"] = runId });
 
-
             logger.LogInformation("Scrape-run {RunId} started at {StartTime:yyyy-MM-dd HH:mm:ss}", runId, report.StartTime);
+
+            // applicatieversie loggen aan het begin van elke scrape-run, zodat achteraf elke scraperun herleidbaar is naar welke codeversie gebruikt is (github repo versie)
+            string? applicationVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            logger.LogInformation("Application version: {ApplicationVersion}, Booking.com request delay {BookingDelayMs}ms, Airbnb request delay {AirbnbDelayMs}ms, max retries {MaxRetries} " +
+                                    "(initial delay {RetryDelaySeconds}s, exponential backoff)", applicationVersion, options.Value.Booking.RequestDelayMs, options.Value.Airbnb.RequestDelayMs,
+                                    options.Value.Resilience.MaxRetries, options.Value.Resilience.RetryDelaySeconds);
 
             foreach (IAccommodationSource source in sources)
             {
+                // stopwatch die de duration van elk individueel platform bijhoudt
+                Stopwatch platformRunStopwatch = Stopwatch.StartNew();
+
                 // platformnaam aan elke log tijdens de platform-run toevoegen
                 using IDisposable? platformScope = logger.BeginScope(new Dictionary<string, object> { ["Platform"] = source.PlatformName });
                 PlatformRunStats platformStats = new PlatformRunStats { PlatformName = source.PlatformName, AreaCount = options.Value.Areas.Count };
@@ -54,23 +64,28 @@ namespace Toeristenscraper.Scraper.Orchestration
                     // discovery per gebied starten (te scrapen gebieden per run worden geconfigureerd in appsettings.json)
                     foreach (ScrapeArea area in options.Value.Areas)
                     {
-                        // method uit TileAlgorithm.cs aanroepen die de discovery (inclusief tegelsplitsing) van accommodaties uitvoert.
-                        // resultaten per gebied worden toegevoegd aan de platformresults lijst
+                        // method uit TileAlgorithm.cs aanroepen die de discovery (inclusief tegelsplitsing) van accommodaties uitvoert
                         var (accommodations, areaFailedTiles) = await tileAlgorithm.DiscoverAsync(source, area, source.MaxDepth, ct);
-                        platformResults.AddRange(accommodations);
+                        // resultaten per gebied worden toegevoegd aan de platformresults lijst
+                        platformResults.AddRange(accommodations);   
+                        // aantal opgehaalde listings per scrape-gebied opslaan zodat het gelogd kan worden tijdens de platform-run
+                        platformStats.ListingsPerArea.Add(area.Name + ": " + accommodations.Count);
+
                         foreach (Tile failedTile in areaFailedTiles)
                         {
-                            platformStats.FailedTiles += 1;
-                            report.FailedTiles.Add($"{source.PlatformName}/{area.Name}/{failedTile.Name}");
+                            platformStats.FailedTileNames.Add(area.Name + "/" + failedTile.Name);
                         }
                     }
 
                     // lijst van alle opgehaalde accommodatie-listings ontdubbelen en in een nieuwe gefilterde lijst zetten
                     List<DiscoveredAccommodation> deduplicatedList = platformResults.DistinctBy(accommodation => accommodation.SourceId).ToList();
 
-                    // aantallen vastleggen voor de samenvatting aan het einde van de run
-                    platformStats.FoundListings = platformResults.Count;
-                    platformStats.UniqueListings = deduplicatedList.Count;
+                    // aantallen vastleggen voor de samenvatting aan het einde van de platform-run
+                    platformStats.FoundListingsCount = platformResults.Count;
+                    platformStats.UniqueListingsCount = deduplicatedList.Count;
+
+                    logger.LogInformation("{Platform}: discovery completed, {Found} found ({ListingsPerArea}), {Unique} unique",
+                                            source.PlatformName, platformStats.FoundListingsCount, string.Join(", ", platformStats.ListingsPerArea), platformStats.UniqueListingsCount);
 
                     // variabele om het aantal opeenvolgend falende requests bij te houden. wanneer het aantal even groot is als de configureerde max consecutive failed requests in de configuratie, stopt het platform met scrapen
                     int consecutiveFailures = 0;
@@ -83,7 +98,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                         {
                             if (!string.Equals(listing.CountryCode, "nl", StringComparison.OrdinalIgnoreCase))
                             {
-                                platformStats.ForeignListings += 1;
+                                platformStats.ForeignListingsCount += 1;
                                 continue;
                             }
                         }
@@ -93,7 +108,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                             bool isDutchListing = await dbWriter.IsDutchListingAsync(listing.Latitude, listing.Longitude, ct);
                             if (!isDutchListing)
                             {
-                                platformStats.ForeignListings += 1;
+                                platformStats.ForeignListingsCount += 1;
                                 continue;
                             }
                         }
@@ -109,7 +124,7 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                             if (batch.Count == WriteToDb.BatchSize) 
                             {
-                                platformStats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
+                                platformStats.FailedListingsCount += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
                             }
                             consecutiveFailures = 0;
                         }
@@ -139,7 +154,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                             {
                                 logger.LogWarning(ex, "Listing {SourceId} on {Platform} skipped (unexpected error)", listing.SourceId, source.PlatformName);
                             }
-                            platformStats.FailedListings += 1;
+                            platformStats.FailedListingsCount += 1;
                             consecutiveFailures += 1;
                             
                             if (consecutiveFailures >= options.Value.Resilience.MaxConsecutiveFailures)
@@ -149,19 +164,17 @@ namespace Toeristenscraper.Scraper.Orchestration
                         }
                     }
                     // laatste batch wegschrijven. het return type van SaveBatchAsync is het aantal gefaalde listings voor het platform waarvoor weggeschreven wordt
-                    platformStats.FailedListings += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
+                    platformStats.FailedListingsCount += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
 
                 }
                 catch (BrokenCircuitException)  // loggen wanneer circuit geopent is (run gestopt for specifiek platform)
                 {
-                    platformStats.Stopped = true;
-                    report.StoppedPlatforms.Add($"{source.PlatformName} (circuit open)");
+                    platformStats.StopReason = "Circuit open (Polly resilience)";
                     logger.LogError("Scrape-run {RunId}: circuit opened for {Platform}, platform stopped for this run", runId, source.PlatformName);
                 }
                 catch (Exception ex) 
                 {
-                    platformStats.Stopped = true;
-                    report.StoppedPlatforms.Add($"{source.PlatformName} ({ex.GetType().Name})");
+                    platformStats.StopReason = ex.GetType().Name; // ex.Message kan ook als de error logging concreter moet
 
                     // verwachte fouten: melding is genoeg, geen stacktrace nodig
                     if (IsDatabaseUnavailable(ex) || ex is BlockedException || ex is OutdatedHashException || ex is HttpRequestException || ex is MaxConsecutiveFailuresException)
@@ -173,10 +186,15 @@ namespace Toeristenscraper.Scraper.Orchestration
                         logger.LogError(ex, "Scrape-run {RunId}: unexpected error on {Platform}", runId, source.PlatformName);
                     }
                 }
+                // einde platform run
+                platformRunStopwatch.Stop();
+                platformStats.PlatformRunDuration = platformRunStopwatch.Elapsed;
+                platformStats.LogSummary(logger, scrapingDate);
+
             }
-            // einde run: eindtijd en totale duur van de scraperun loggen.
-            stopwatch.Stop();
-            report.Duration = stopwatch.Elapsed;
+            // einde (totale) run: eindtijd en totale duur van de scraperun loggen.
+            scrapeRunStopwatch.Stop();
+            report.Duration = scrapeRunStopwatch.Elapsed;
             report.LogSummary(logger);
         }
 
@@ -187,7 +205,11 @@ namespace Toeristenscraper.Scraper.Orchestration
             try
             {
                 await dbWriter.WriteBatchAsync(source.PlatformId, scrapingDate, batch, platformStats, ct);
-                platformStats.ProcessedListings += batch.Count;
+                platformStats.ProcessedListingsCount += batch.Count;
+                if (batch.Count > 0)
+                {
+                    logger.LogInformation("{Platform}: {ProcessedListingsCount}/{UniqueListingsCount} listings processed.", source.PlatformName, platformStats.ProcessedListingsCount, platformStats.UniqueListingsCount);
+                }
 
             }
             catch (Exception ex)
