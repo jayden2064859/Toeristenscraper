@@ -10,6 +10,7 @@
         public int UniqueListingsCount { get; set; }
         public int ForeignListingsCount { get; set; }
         public int FailedListingsCount { get; set; }
+        public int CooldownCount { get; set; } 
         public List<string> FailedTileNames { get; set; } = new List<string>();
         public List<string> ListingsPerArea { get; set; } = new List<string>();
         public int FailedTilesCount
@@ -90,6 +91,7 @@
             logger.LogInformation(
                     "{Platform} (duration {PlatformRunDuration:hh\\:mm\\:ss})" +
                     "\n  Stopped         {Stopped}" +
+                    "\n  Cooldowns       {CooldownCount}" +
                     "\n  Failed tiles    {FailedTileNames}" +
                     "\n  Scraping" +
                     "\n    Discovery     {Found} found in {Areas} area(s), {Duplicates} duplicates -> {Unique} unique" +
@@ -101,16 +103,16 @@
                     "\n    Reviews       {Reviews} new or changed" +
                     "\n    Amenities     {AmenitySets} listings with new or changed amenities ({Amenities} amenities)" +
                     "\n    Availability  {Rows} days for {AvailabilityListings} listings, compressed from {CompressionDate}",
-                    PlatformName, PlatformRunDuration,
-                    stopped, failedTiles,
-                    FoundListingsCount, AreaCount, DuplicatesCount, UniqueListingsCount,
-                    ForeignListingsCount, ValidListingsCount,
-                    ProcessedListingsCount, FailedListingsCount,
-                    NewListingVersionsCount, UnchangedListingsCount, SkippedAlreadyScrapedCount,
-                    NewRoomsCount, NewRoomAmenitiesCount,
-                    NewReviewsCount,
-                    NewAmenitySetsCount, NewAmenitiesCount,
-                    AvailabilityRowsCount, ListingsWithAvailabilityCount, scrapingDate.AddDays(2).ToString("yyyy-MM-dd"));
+                    this.PlatformName, this.PlatformRunDuration,
+                    stopped, this.CooldownCount, failedTiles, 
+                    this.FoundListingsCount, this.AreaCount, this.DuplicatesCount, this.UniqueListingsCount,
+                    this.ForeignListingsCount, this.ValidListingsCount,
+                    this.ProcessedListingsCount, this.FailedListingsCount,
+                    this.NewListingVersionsCount, this.UnchangedListingsCount, this.SkippedAlreadyScrapedCount,
+                    this.NewRoomsCount, this.NewRoomAmenitiesCount,
+                    this.NewReviewsCount,
+                    this.NewAmenitySetsCount, this.NewAmenitiesCount,
+                    this.AvailabilityRowsCount, this.ListingsWithAvailabilityCount, scrapingDate.AddDays(2).ToString("yyyy-MM-dd"));
         }
     }
 }

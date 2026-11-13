@@ -40,15 +40,15 @@
         {
             if (Status == "Failed")
             {
-                logger.LogError("Scrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
+                logger.LogError("Scrape-run {RunId} completed: {Status} (duration {Duration:hh\\:mm\\:ss})", RunId, Status, Duration);
             }
             else if (Status == "PartiallyFailed")
             {
-                logger.LogWarning("Scrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
+                logger.LogWarning("Scrape-run {RunId} completed: {Status} (duration {Duration:hh\\:mm\\:ss})", RunId, Status, Duration);
             }
             else
             {
-                logger.LogInformation("Scrape-run {RunId} completed: {Status} (duration {Duration})", RunId, Status, Duration);
+                logger.LogInformation("Scrape-run {RunId} completed: {Status} (duration {Duration:hh\\:mm\\:ss})", RunId, Status, Duration);
             }
 
             // gestopte platforms en mislukte tegels worden afgeleid uit de stats per platform
@@ -76,7 +76,7 @@
             {
                 tiles = string.Join(", ", failedTiles);
             }
-            logger.LogInformation("Stopped platforms: {Stopped}\nFailed tiles: {FailedTiles}", stopped, tiles);
+            logger.LogInformation("Stopped platforms: {Stopped}, Failed tiles: {FailedTiles}", stopped, tiles);
         }
     }
 }

@@ -55,7 +55,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
             }
 
 
-            logger.LogDebug("Tile {TileName}: nbResultsTotal = {Total}, retrieved = {Count}",
+            logger.LogDebug("Booking.com: tile {TileName}: nbResultsTotal = {Total}, retrieved = {Count}",
             tile.Name, firstPage.NbResultsTotal, allAccommodations.Count);
             return new TileSearchResult(allAccommodations, LimitReached: false);
         }

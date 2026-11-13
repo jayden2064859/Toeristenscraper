@@ -53,6 +53,9 @@ namespace Toeristenscraper.Scraper.Configuration
         public double CircuitFailureRatio { get; set; }
         public int TimeoutSeconds { get; set; }
         public int MaxConsecutiveFailures { get; set; }
+        public int CooldownMinutes { get; set; }
+        public int MaxCooldowns { get; set; }
+
     }
 
     // zoekparameters voor detailoperaties die prijzen teruggeven, gelijk voor alle platforms zodat prijzen vergelijkbaar zijn

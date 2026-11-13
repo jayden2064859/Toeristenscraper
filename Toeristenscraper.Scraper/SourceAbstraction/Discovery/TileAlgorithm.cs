@@ -54,19 +54,21 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
 
                     if (ex is HttpRequestException)
                     {
-                        logger.LogWarning("Tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped: {Error}", area.Name, tile.Name, tile.Depth, source.PlatformName, ex.Message);
+                        logger.LogWarning("{Platform}: tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped: {Error}", 
+                            source.PlatformName, area.Name, tile.Name, tile.Depth, source.PlatformName, ex.Message);
                     }
                     else
                     {
-                        logger.LogWarning(ex, "Tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped (unexpected error)", area.Name, tile.Name, tile.Depth, source.PlatformName);
+                        logger.LogWarning(ex, "{Platform}: tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped (unexpected error)",
+                            source.PlatformName, area.Name, tile.Name, tile.Depth, source.PlatformName);
                     }
                     failedTiles.Add(tile);
                     continue;   // door met de volgende tegel in de queue
                 }
 
                 // loggen op welk tegelniveau momenteel gescraped wordt
-                logger.LogDebug("Tile {Area}/{TileName} (depth {Depth}): limit reached = {LimitReached}, count: {ListingsCount}",
-                area.Name, tile.Name, tile.Depth, result.LimitReached, result.Accommodations.Count());
+                logger.LogDebug("{Platform}: tile {Area}/{TileName} (depth {Depth}): limit reached = {LimitReached}, count: {ListingsCount}",
+                source.PlatformName, area.Name, tile.Name, tile.Depth, result.LimitReached, result.Accommodations.Count());
 
                 if (result.LimitReached == false)
                 {
