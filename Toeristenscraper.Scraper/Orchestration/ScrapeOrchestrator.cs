@@ -7,6 +7,7 @@ using System.Reflection;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Reporting;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
 using Toeristenscraper.Scraper.Storage;
 
@@ -41,8 +42,7 @@ namespace Toeristenscraper.Scraper.Orchestration
             // ook aan het begin van elke scrape-run loggen welke polly config gebruikt wordt: maximale retries per listing voordat de listing overgeslagen wordt, de retry-strategie, en cooldown-strategie (max-cooldowns limiet bereikt = platform stopt met scrapen)
             logger.LogInformation("Resilience: max retries {MaxRetries} (initial delay {RetryDelaySeconds}s, exponential backoff), cooldown of {CooldownMinutes} min after {MaxConsecutiveFailures} consecutive failed listings, platform stops after {MaxCooldowns} cooldowns without success",
                 options.Value.Resilience.MaxRetries, options.Value.Resilience.RetryDelaySeconds,
-                options.Value.Resilience.MaxConsecutiveFailures, options.Value.Resilience.CooldownMinutes, options.Value.Resilience.MaxCooldowns);
-
+                options.Value.Resilience.CooldownMinutes, options.Value.Resilience.MaxConsecutiveFailures, options.Value.Resilience.MaxCooldowns);
             // lijst van tasks aanmaken die uitgevoerd moeten worden in een run (scrape-runs van alle bestaande platforms)
             List<Task> tasks = new List<Task>();
             foreach (IAccommodationSource source in sources)
@@ -201,6 +201,9 @@ namespace Toeristenscraper.Scraper.Orchestration
                         // detailoperaties van de listing uitvoeren om het datamodel te vullen per listing
                         AccommodationDetails details = await source.GetDetailsAsync(listing, availabilityDays, ct);
 
+                        // alle gescrapete fields controleren of ze nog werken naar behoren
+                        CountRetrievedFields(platformStats, listing, details, availabilityDays);
+
                         // alle requests voor deze listing zijn gelukt. tellers voor de foutafhandeling resetten
                         consecutiveFailures = 0;
                         cooldownsWithoutSuccess = 0;
@@ -230,7 +233,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                         {
                             throw;
                         }
-                        if (ex is HttpRequestException)
+                        if (ex is HttpRequestException || ex is GraphQLErrorException)
                         {
                             logger.LogWarning("Listing {SourceId} on {Platform} skipped: {Error}", listing.SourceId, source.PlatformName, ex.Message);
                         }
@@ -290,8 +293,28 @@ namespace Toeristenscraper.Scraper.Orchestration
             // einde platform run
             platformRunStopwatch.Stop();
             platformStats.PlatformRunDuration = platformRunStopwatch.Elapsed;
+            platformStats.CheckFieldFillRates(logger, source.MonitoredFields);
             platformStats.LogSummary(logger, scrapingDate);
 
+        }
+
+        // methode om te controleren welke waarde voor elke field is opgehaald.
+        // als alle listings waarde null hebben teruggekregen voor de specifieke field, wordt er een warning gelogged
+        private void CountRetrievedFields(PlatformRunStats platformStats, DiscoveredAccommodation listing, AccommodationDetails details, IReadOnlyList<Availability> availabilityDays)
+        {
+            platformStats.CheckedListingsCount += 1;
+            platformStats.CountField(MonitoredField.Title, listing.Title != null);
+            platformStats.CountField(MonitoredField.Coordinates, listing.Latitude != null);
+            platformStats.CountField(MonitoredField.AccommodationType, (details.AccommodationType ?? listing.AccommodationType) != null);
+            platformStats.CountField(MonitoredField.Availability, availabilityDays.Count > 0);
+            platformStats.CountField(MonitoredField.Rooms, details.Rooms.Count > 0);
+            platformStats.CountField(MonitoredField.TotalPrice, details.Rooms.Any(r => r.TotalPrice != null));
+            platformStats.CountField(MonitoredField.Amenities, details.Amenities.Count > 0);
+            platformStats.CountField(MonitoredField.ReviewCount, (details.ReviewCount ?? listing.ReviewCount) != null);
+            platformStats.CountField(MonitoredField.KvkNumber, details.KvkNumber != null);
+            platformStats.CountField(MonitoredField.RegistrationNumber, details.RegistrationNumber != null);
+            platformStats.CountField(MonitoredField.StarClassification, listing.StarClassification != null);
+            platformStats.CountField(MonitoredField.Superhost, (details.Superhost ?? listing.Superhost) != null);
         }
     }
 }

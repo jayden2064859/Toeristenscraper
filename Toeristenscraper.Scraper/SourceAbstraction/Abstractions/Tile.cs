@@ -10,5 +10,6 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
         double SwLat,
         double SwLng,
         string Name,
-        int Depth);
+        int Depth,
+        int Attempts = 0); // parameter om bij te houden hoe vaak er een request voor een tegel opnieuw is uitgevoerd
 }

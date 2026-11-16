@@ -18,7 +18,7 @@
                     {
                         failedPlatforms += 1;
                     }
-                    if (platform.FailedTilesCount > 0 || platform.FailedListingsCount > 0)
+                    if (platform.FailedTilesCount > 0)
                     {
                         errorOccurred = true;
                     }
@@ -26,12 +26,15 @@
 
                 if (failedPlatforms == Platforms.Count)
                 {
+                    // een scrape-run wordt alleen als 'Failed' gezien als beide platforms gestopt zijn tijdens de run
                     return "Failed";
                 }
                 if (failedPlatforms > 0 || errorOccurred)
                 {
+                    // een scrape-run wordt als PartiallyFailed gezien als er minstens 1 platform gestopt is, of wanneer er minstens 1 gehele tegel tijdens discovery mislukt is
                     return "PartiallyFailed";
                 }
+                // een scrape-run is succeeded wanneer er geen platforms gestopt zijn en geen individuele tegels mislukt zijn tijdens discovery. Losse listings mogen falen, die worden individueel overgeslagen en wordt afgehandeld met Polly.
                 return "Succeeded";
             }
         }

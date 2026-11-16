@@ -10,7 +10,7 @@
         public int UniqueListingsCount { get; set; }
         public int ForeignListingsCount { get; set; }
         public int FailedListingsCount { get; set; }
-        public int CooldownCount { get; set; } 
+        public int CooldownCount { get; set; }
         public List<string> FailedTileNames { get; set; } = new List<string>();
         public List<string> ListingsPerArea { get; set; } = new List<string>();
         public int FailedTilesCount
@@ -34,7 +34,7 @@
             }
         }
         public int ProcessedListingsCount { get; set; }
-        public TimeSpan PlatformRunDuration { get; set; } 
+        public TimeSpan PlatformRunDuration { get; set; }
 
         // properties die WriteToDb vult
         public int NewListingVersionsCount { get; set; }
@@ -104,7 +104,7 @@
                     "\n    Amenities     {AmenitySets} listings with new or changed amenities ({Amenities} amenities)" +
                     "\n    Availability  {Rows} days for {AvailabilityListings} listings, compressed from {CompressionDate}",
                     this.PlatformName, this.PlatformRunDuration,
-                    stopped, this.CooldownCount, failedTiles, 
+                    stopped, this.CooldownCount, failedTiles,
                     this.FoundListingsCount, this.AreaCount, this.DuplicatesCount, this.UniqueListingsCount,
                     this.ForeignListingsCount, this.ValidListingsCount,
                     this.ProcessedListingsCount, this.FailedListingsCount,
@@ -113,6 +113,43 @@
                     this.NewReviewsCount,
                     this.NewAmenitySetsCount, this.NewAmenitiesCount,
                     this.AvailabilityRowsCount, this.ListingsWithAvailabilityCount, scrapingDate.AddDays(2).ToString("yyyy-MM-dd"));
+        }
+
+
+        // onderstaande code is om voor elke sxrape-run te controleren of de huidige fields die in de parsers worden gebruikt om data mee op te halen, nog actueel zijn en nog werken.
+        // er wordt bijgehouden hoeveel fields er in totaal gecontroleerd zijn, en hoe vaak er uit deze field een daadwerkelijke waarde is gehaald.
+        // als alle listings waarde null hebben, is het een sterke indicatie dat de field niet meer klopt. In dit geval wordt er een Warning gelogged. 
+        public int CheckedListingsCount { get; set; }
+        public Dictionary<MonitoredField, int> FilledFieldCounts { get; set; } = new Dictionary<MonitoredField, int>();
+
+        public void CountField(MonitoredField field, bool hasValue)
+        {
+            if (!FilledFieldCounts.ContainsKey(field))
+            {
+                FilledFieldCounts[field] = 0;
+            }
+            if (hasValue)
+            {
+                FilledFieldCounts[field] += 1;
+            }
+        }
+
+        public void CheckFieldFillRates(ILogger logger, IReadOnlyList<MonitoredField> monitoredFields)
+        {
+            if (CheckedListingsCount < 100)
+            {
+                return; // te weinig listings voor een betrouwbare controle
+            }
+            foreach (MonitoredField field in monitoredFields)
+            {
+                int filled = FilledFieldCounts.GetValueOrDefault(field);
+                if (filled == 0)
+                {
+                    logger.LogWarning("{Platform}: field {Field} is empty for all {Count} listings, response structure may have changed",
+                        PlatformName, field, CheckedListingsCount);
+                }
+            }
+
         }
     }
 }

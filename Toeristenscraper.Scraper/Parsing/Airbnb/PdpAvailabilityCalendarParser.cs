@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Toeristenscraper.Scraper.Parsing.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 
 namespace Toeristenscraper.Scraper.Parsing.Airbnb
 {
@@ -10,6 +11,14 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
     {
         public static PdpAvailabilityCalendarPage Parse(JsonDocument doc, DateOnly scrapingDate)
         {
+
+
+            if (doc.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
+            {
+                string? message = GetJsonElementHelper.Get(errors[0], "message")?.GetString();
+                throw new GraphQLErrorException("PdpAvailabilityCalendar: response contains GraphQL error: " + message);
+            }
+
             // JSON element waar de daadwerkelijke beschikbaarheidsdagen in zitten, gesorteerd in aparte objecten voor elke kalendermaand
             JsonElement calendarMonths = GetJsonElementHelper.Get(doc.RootElement, "data", "merlin", "pdpAvailabilityCalendar", "calendarMonths")
                 ?? throw new InvalidOperationException("PdpAvailabilityCalendar: missing required fields inside JSON-response: data.merlin.pdpAvailabilityCalendar.calendarMonths");

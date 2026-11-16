@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Toeristenscraper.Scraper.Parsing.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 
 namespace Toeristenscraper.Scraper.Parsing.Airbnb
 {
@@ -21,9 +22,10 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
         public static AccommodationDetails Parse(JsonDocument doc, DateOnly checkIn, DateOnly checkOut, int adults, int children, int pets)
         {
 
-            if (doc.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array)
+            if (doc.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
             {
-                throw new InvalidOperationException("StaysPdpSections: response contains GraphQL errors: " + errors.ToString());
+                string? message = GetJsonElementHelper.Get(errors[0], "message")?.GetString();
+                throw new GraphQLErrorException("StaysPdpSections: response contains GraphQL error: " + message);
             }
 
             JsonElement node = GetJsonElementHelper.Get(doc.RootElement, "data", "node")

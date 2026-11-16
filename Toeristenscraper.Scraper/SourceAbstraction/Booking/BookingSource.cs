@@ -4,6 +4,7 @@ using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Parsing.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations;
+using Toeristenscraper.Scraper.Reporting;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 {
@@ -14,6 +15,23 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
         public string PlatformName { get; } = "Booking.com";
         public int PlatformId { get; } = 1;
         public int MaxDepth => options.Value.Booking.MaxDepth;
+
+        // alle booking.com-gerelateerde fields bijhouden om later te controleren of alle fields nog correct gevuld worden tijdens het scrapen van data
+        public IReadOnlyList<MonitoredField> MonitoredFields { get; } = new[]
+        {
+            MonitoredField.Title,
+            MonitoredField.AccommodationType,
+            MonitoredField.Coordinates,
+            MonitoredField.Availability,
+            MonitoredField.Rooms,
+            MonitoredField.TotalPrice,
+            MonitoredField.Amenities,
+            MonitoredField.ReviewCount,
+            MonitoredField.KvkNumber,
+            MonitoredField.RegistrationNumber,
+            MonitoredField.StarClassification,
+        };
+
 
         public async Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken ct)
         {

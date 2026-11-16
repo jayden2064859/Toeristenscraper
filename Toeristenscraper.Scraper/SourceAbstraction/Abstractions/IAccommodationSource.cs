@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using static System.Net.WebRequestMethods;
-
+﻿using Toeristenscraper.Scraper.Reporting;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
 {
@@ -12,6 +8,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
         public string PlatformName { get; }
         public int PlatformId { get; }
         int MaxDepth { get; }
+        IReadOnlyList<MonitoredField> MonitoredFields { get; } // lijst van fields die per platform gecontroleerd worden (controle of de fields nog daadwerkelijk waarden teruggeven)
 
         // discovery operaties: om accommodatie listings te ontdekken binnen een geconfigureerd zoekgebied
         Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken cancellationToken);

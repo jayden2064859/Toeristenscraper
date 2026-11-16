@@ -3,6 +3,7 @@ using Polly.CircuitBreaker;
 using System.Net;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 
 
 
@@ -51,8 +52,18 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
                     {
                         throw;
                     }
+                    // eerste mislukte poging van een tegel (na 4 mislukte requests in totaal). 
+                    // er wordt nog 1 keer een request geprobeerd, achteraan in de queue
+                    if (tile.Attempts == 0)
+                    {
+                        logger.LogWarning("{Platform}: tile {Area}/{TileName} failed, retrying once at the end of the queue (Error: {Error})",
+                            source.PlatformName, area.Name, tile.Name, ex.Message);
+                        await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                        queue.Enqueue(tile with { Attempts = 1 });
+                        continue;
 
-                    if (ex is HttpRequestException)
+                    }
+                    if (ex is HttpRequestException || ex is GraphQLErrorException)
                     {
                         logger.LogWarning("{Platform}: tile {Area}/{TileName} (depth {Depth}) on {Platform} skipped: {Error}", 
                             source.PlatformName, area.Name, tile.Name, tile.Depth, source.PlatformName, ex.Message);

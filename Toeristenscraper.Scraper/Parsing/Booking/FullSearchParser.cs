@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
 
 namespace Toeristenscraper.Scraper.Parsing.Booking
@@ -15,6 +16,14 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
     {
         public static FullSearchPage Parse(JsonDocument doc)
         {
+
+
+            if (doc.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
+            {
+                string? message = GetJsonElementHelper.Get(errors[0], "message")?.GetString();
+                throw new GraphQLErrorException("FullSearch: response contains GraphQL error: " + message);
+            }
+
             // de search node ophalen, dit is de root van de resultaten
             JsonElement search = GetJsonElementHelper.Get(doc.RootElement, "data", "searchQueries", "search")
                  ?? throw new InvalidOperationException("FullSearch: missing required field inside JSON-response: data.searchQueries.search (contains the entire search results data)");

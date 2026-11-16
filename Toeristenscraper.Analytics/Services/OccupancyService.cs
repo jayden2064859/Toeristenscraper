@@ -68,7 +68,7 @@ namespace Toeristenscraper.Analytics.Services
         public Task<OccupancyResult> CalculateForwardOccupancyRateAsync(InsightFilter filter, CancellationToken ct)
         {
             IQueryable<LatestObservation> observations = availabilityQueries.GetLatestObservations(filter);
-            observations = observations.Where(o => o.availabilityDate < filter.referenceDate);
+            observations = observations.Where(o => o.availabilityDate >= filter.referenceDate);
             return CalculateAsync(observations, filter, ct);
 
         }

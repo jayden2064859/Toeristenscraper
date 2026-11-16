@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 
 namespace Toeristenscraper.Scraper.Parsing.Booking
 {
@@ -13,6 +14,14 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
 
         public static AvailabilityCalendarPage Parse(JsonDocument doc)
         {
+
+
+            if (doc.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
+            {
+                string? message = GetJsonElementHelper.Get(errors[0], "message")?.GetString();
+                throw new GraphQLErrorException("AvailabilityCalendar: response contains GraphQL error: " + message);
+            }
+
             // eerst checken of de response de juiste data bevat (correcte typeName in de response)
             JsonElement? typeName = GetJsonElementHelper.Get(doc.RootElement, "data", "availabilityCalendar", "__typename");
             if (typeName != null && typeName.Value.GetString() == "AvailabilityCalendarQueryError")

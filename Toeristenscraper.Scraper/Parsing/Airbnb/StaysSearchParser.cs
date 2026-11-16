@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Toeristenscraper.Scraper.Parsing.Booking;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 
 namespace Toeristenscraper.Scraper.Parsing.Airbnb
 {
@@ -11,6 +12,14 @@ namespace Toeristenscraper.Scraper.Parsing.Airbnb
     {
         public static StaysSearchPage Parse(JsonDocument doc)
         {
+
+
+            if (doc.RootElement.TryGetProperty("errors", out JsonElement errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
+            {
+                string? message = GetJsonElementHelper.Get(errors[0], "message")?.GetString();
+                throw new GraphQLErrorException("StaysSearch: response contains GraphQL error: " + message);
+            }
+
             // results node bevat benodigde page cursors en metadata
             JsonElement results = GetJsonElementHelper.Get(doc.RootElement, "data", "presentation", "staysSearch", "results")
                 ?? throw new InvalidOperationException("StaysSearch: missing required field inside JSON-response: data.presentation.staysSearch.results (contains the entire search results data)");

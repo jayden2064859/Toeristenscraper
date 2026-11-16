@@ -3,7 +3,9 @@ using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Parsing.Airbnb;
 using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 using Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations;
+using Toeristenscraper.Scraper.Reporting;
 
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb
@@ -14,6 +16,22 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb
         public string PlatformName { get; } = "Airbnb";
         public int PlatformId { get; } = 2;
         public int MaxDepth => options.Value.Airbnb.MaxDepth;
+
+        // alle airbnb-gerelateerde fields bijhouden om later te controleren of alle fields nog correct gevuld worden tijdens het scrapen van data
+        public IReadOnlyList<MonitoredField> MonitoredFields { get; } = new[]
+        {
+            MonitoredField.Title,
+            MonitoredField.AccommodationType,
+            MonitoredField.Coordinates,
+            MonitoredField.Availability,
+            MonitoredField.Rooms,
+            MonitoredField.TotalPrice,
+            MonitoredField.Amenities,
+            MonitoredField.ReviewCount,
+            MonitoredField.KvkNumber,
+            MonitoredField.RegistrationNumber,
+            MonitoredField.Superhost,
+        };
 
         public async Task<TileSearchResult> SearchTileAsync(Tile tile, CancellationToken ct)
         {
@@ -65,8 +83,20 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb
             }
             DateOnly checkOut = checkIn.AddDays(nights);
 
-            using JsonDocument doc = await staysPdpSections.GetPageAsync(listing.SourceId, checkIn, checkOut, ct);
-            return StaysPdpSectionsParser.Parse(doc, checkIn, checkOut, search.Adults, search.Children, search.Pets);
+            AccommodationDetails details;
+            try
+            {
+                using JsonDocument doc = await staysPdpSections.GetPageAsync(listing.SourceId, checkIn, checkOut, ct);
+                details = StaysPdpSectionsParser.Parse(doc, checkIn, checkOut, search.Adults, search.Children, search.Pets);
+            }
+            catch (GraphQLErrorException)
+            {
+                // airbnb geeft af en toe een tijdelijke fout in het errors-veld ('please try again later'). één keer opnieuw proberen
+                await Task.Delay(TimeSpan.FromSeconds(2), ct);
+                using JsonDocument retryDoc = await staysPdpSections.GetPageAsync(listing.SourceId, checkIn, checkOut, ct);
+                details = StaysPdpSectionsParser.Parse(retryDoc, checkIn, checkOut, search.Adults, search.Children, search.Pets);
+            }
+            return details;
         }
     }
 }

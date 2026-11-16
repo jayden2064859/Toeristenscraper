@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
+namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions
 {
     // wordt teruggegeven wanneer het aantal opeenvolgende listings die mislukken (alle soorten requests) even groot is als het geconfigureerde max aantal
     public class MaxConsecutiveFailuresException(string message) : Exception(message)
