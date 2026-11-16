@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
 using Toeristenscraper.Scraper.Transport;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations
