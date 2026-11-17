@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.Models;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations
+namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
 {
     public class StaysSearch(HttpClient httpClient)
     {

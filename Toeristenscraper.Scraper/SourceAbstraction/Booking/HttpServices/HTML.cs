@@ -3,10 +3,10 @@ using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
+using Toeristenscraper.Scraper.Exceptions;
 using Toeristenscraper.Scraper.Transport;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations
+namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.HttpServices
 {
     // HTML van accommodatiepagina's worden opgehaald om voorzieningen en kamergerelateerde data per listing op te halen
     public class HTML(HttpClient httpClient, IOptions<ScraperOptions> options, BookingCookieProvider cookieProvider)

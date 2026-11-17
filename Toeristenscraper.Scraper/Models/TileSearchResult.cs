@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
+namespace Toeristenscraper.Scraper.Models
 {
     // uitkomst van het doorzoeken van één tegel.
     //  de tegel moet worden opgesplitst wanneer LimitReached = true

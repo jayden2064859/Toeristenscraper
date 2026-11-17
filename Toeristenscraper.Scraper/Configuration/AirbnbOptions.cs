@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Toeristenscraper.Scraper.Configuration;
 
-namespace Toeristenscraper.Scraper.Configurations
+namespace Toeristenscraper.Scraper.Configuration
 {
     public class AirbnbOptions : PlatformOptions
     {

@@ -1,6 +1,4 @@
-﻿using Toeristenscraper.Scraper.Configurations;
-
-namespace Toeristenscraper.Scraper.Configuration
+﻿namespace Toeristenscraper.Scraper.Configuration
 {
     // instellingen voor de scraper, uit de sectie "Scraper" in appsettings.json 
     public class ScraperOptions

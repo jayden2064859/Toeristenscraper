@@ -1,7 +1,5 @@
-﻿using Microsoft.Extensions.Options;
-using Microsoft.Playwright;
-using Toeristenscraper.Scraper.Configuration;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
+﻿using Microsoft.Playwright;
+using Toeristenscraper.Scraper.Exceptions;
 
 namespace Toeristenscraper.Scraper.Transport
 {

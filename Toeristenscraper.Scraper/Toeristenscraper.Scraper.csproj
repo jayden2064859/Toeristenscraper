@@ -38,7 +38,4 @@
 		<None Update="SourceAbstraction\Booking\Queries\*.json" CopyToOutputDirectory="PreserveNewest" />
 		<None Update="SourceAbstraction\Airbnb\Queries\*.json" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
-  <ItemGroup>
-    <Folder Include="SourceAbstraction\Booking\Queries\" />
-  </ItemGroup>
 </Project>

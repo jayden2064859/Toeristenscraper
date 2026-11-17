@@ -1,11 +1,11 @@
 ﻿using Microsoft.Extensions.Options;
 using System.Text.Json;
-using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Parsing.Airbnb;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
-using Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations;
 using Toeristenscraper.Scraper.Reporting;
+using Toeristenscraper.Scraper.Models;
+using Toeristenscraper.Scraper.Exceptions;
+using Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices;
+using Toeristenscraper.Scraper.Configuration;
 
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb

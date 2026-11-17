@@ -5,10 +5,11 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using Toeristenscraper.Scraper.Configuration;
+using Toeristenscraper.Scraper.Discovery;
+using Toeristenscraper.Scraper.Exceptions;
+using Toeristenscraper.Scraper.Models;
 using Toeristenscraper.Scraper.Reporting;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
-using Toeristenscraper.Scraper.SourceAbstraction.Discovery;
+using Toeristenscraper.Scraper.SourceAbstraction;
 using Toeristenscraper.Scraper.Storage;
 
 namespace Toeristenscraper.Scraper.Orchestration
@@ -27,7 +28,7 @@ namespace Toeristenscraper.Scraper.Orchestration
             Stopwatch scrapeRunStopwatch = Stopwatch.StartNew();
 
             DateOnly scrapingDate = DateOnly.FromDateTime(DateTime.Today);
-            ScraperunReport report = new ScraperunReport { RunId = runId, StartTime = DateTime.Now };
+            ScrapeRunReport report = new ScrapeRunReport { RunId = runId, StartTime = DateTime.Now };
 
             // run-id aan elke log toevoegen zodat in Wazuh alle logs op run-id gefiltered kan worden
             using IDisposable? runScope = logger.BeginScope(new Dictionary<string, object> { ["RunId"] = runId });

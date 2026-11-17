@@ -6,7 +6,7 @@ using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Transport;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.Operations
+namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
 {
     public class StaysPdpSections(HttpClient httpClient, IOptions<ScraperOptions> options, AirbnbHashProvider hashProvider) 
     {

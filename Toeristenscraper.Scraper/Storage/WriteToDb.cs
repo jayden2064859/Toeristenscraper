@@ -3,7 +3,7 @@ using NetTopologySuite.Geometries;
 using Toeristenscraper.Scraper.Reporting;
 using Toeristenscraper.Data;
 using Toeristenscraper.Data.Entities;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.Models;
 
 namespace Toeristenscraper.Scraper.Storage
 {

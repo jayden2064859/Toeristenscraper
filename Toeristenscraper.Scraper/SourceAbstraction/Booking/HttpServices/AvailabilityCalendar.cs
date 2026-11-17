@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations
+namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.HttpServices
 {
     public class AvailabilityCalendar(HttpClient httpClient)
     {

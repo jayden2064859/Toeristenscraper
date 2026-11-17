@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
+using Toeristenscraper.Scraper.Models;
+using Toeristenscraper.Scraper.Parsing.Shared;
 
 namespace Toeristenscraper.Scraper.Parsing.Booking
 {

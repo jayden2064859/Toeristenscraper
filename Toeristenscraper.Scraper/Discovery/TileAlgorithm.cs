@@ -2,12 +2,11 @@
 using Polly.CircuitBreaker;
 using System.Net;
 using Toeristenscraper.Scraper.Configuration;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
+using Toeristenscraper.Scraper.Exceptions;
+using Toeristenscraper.Scraper.Models;
+using Toeristenscraper.Scraper.SourceAbstraction;
 
-
-
-namespace Toeristenscraper.Scraper.SourceAbstraction.Discovery
+namespace Toeristenscraper.Scraper.Discovery
 {
     // hier komt de logica van de bounding-box scrape-strategie: Zoekgebied definieren met neLat, neLon, swLat en swLon.
     // dit gehele gebied wordt verdeeld in tiles, die elk apart gescraped worden.

@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Options;
-using Toeristenscraper.Scraper.Configurations;
+using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Orchestration;
 
-namespace Toeristenscraper.Scraper
+namespace Toeristenscraper.Scraper.Hosting
 {
     // bepaalt wanneer een run wordt gestart
     public class Worker(ILogger<Worker> logger, IServiceScopeFactory scopeFactory, IOptions<ScheduleOptions> options) : BackgroundService

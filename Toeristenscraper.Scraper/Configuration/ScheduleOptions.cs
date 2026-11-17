@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Toeristenscraper.Scraper.Configurations
+namespace Toeristenscraper.Scraper.Configuration
 {
     public class ScheduleOptions
     {

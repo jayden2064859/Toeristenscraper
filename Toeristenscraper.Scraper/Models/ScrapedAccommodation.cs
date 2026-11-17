@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
+namespace Toeristenscraper.Scraper.Models
 {
     // resultaat van discovery + alle detailoperaties (voor 1 listing)
     public class ScrapedAccommodation

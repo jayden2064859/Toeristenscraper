@@ -1,6 +1,6 @@
 ﻿namespace Toeristenscraper.Scraper.Reporting
 {
-    public class ScraperunReport
+    public class ScrapeRunReport
     {
         public Guid RunId { get; set; }
         public DateTime StartTime { get; set; }

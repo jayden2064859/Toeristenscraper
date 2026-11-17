@@ -1,6 +1,7 @@
-﻿using Toeristenscraper.Scraper.Reporting;
+﻿using Toeristenscraper.Scraper.Models;
+using Toeristenscraper.Scraper.Reporting;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
+namespace Toeristenscraper.Scraper.SourceAbstraction
 {
     // contract dat elk platform implementeert
     public interface IAccommodationSource

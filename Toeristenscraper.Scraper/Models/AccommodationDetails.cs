@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Toeristenscraper.Scraper.SourceAbstraction.Abstractions
+namespace Toeristenscraper.Scraper.Models
 {
     // class met fields die in detailoperaties gevonden kunnen worden
     public class AccommodationDetails

@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions.Exceptions;
+using Toeristenscraper.Scraper.Models;
+using Toeristenscraper.Scraper.Parsing.Shared;
+using Toeristenscraper.Scraper.Exceptions;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking;
 
 namespace Toeristenscraper.Scraper.Parsing.Booking

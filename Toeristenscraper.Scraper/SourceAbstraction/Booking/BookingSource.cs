@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Options;
 using System.Text.Json;
-using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Parsing.Booking;
-using Toeristenscraper.Scraper.SourceAbstraction.Abstractions;
-using Toeristenscraper.Scraper.SourceAbstraction.Booking.Operations;
 using Toeristenscraper.Scraper.Reporting;
+using Toeristenscraper.Scraper.Models;
+using Toeristenscraper.Scraper.SourceAbstraction.Booking.HttpServices;
+using Toeristenscraper.Scraper.Configuration;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 {
