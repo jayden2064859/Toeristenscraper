@@ -155,11 +155,15 @@ try
     builder.Services.AddTransient<IAccommodationSource, BookingSource>();
     builder.Services.AddTransient<IAccommodationSource, AirbnbSource>();
 
+    // scoped services (1 instantie per client-request)
     builder.Services.AddScoped<WriteToDb>();
+    builder.Services.AddScoped<RegionDbService>();
 
+    // singleton services (1 instantie gedurende de hele applicatie-lifetime)
     builder.Services.AddSingleton<AirbnbHashProvider>();
     builder.Services.AddSingleton<BookingCookieProvider>();
 
+    // serilog om string-based logs om te zetten naar JSON, dat naar de Azure Blob Storage wordt verstuurt
     builder.Services.AddSerilog((services, loggerConfiguration) =>
     loggerConfiguration.ReadFrom.Configuration(builder.Configuration));
 

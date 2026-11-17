@@ -130,10 +130,11 @@ namespace Toeristenscraper.Scraper.Orchestration
 
             try
             {
-                // WriteToDb gebruikt de DbContext, die scoped is. De orchestrator wordt vanuit de singleton Worker aangeroepen,
+                // WriteToDb en RegionDbService gebruiken de DbContext, die scoped is. De orchestrator wordt vanuit de singleton Worker aangeroepen,
                 // daarom krijgt elk platform een eigen scope en daarmee een eigen DbContext, die na het platform weer wordt opgeruimd
                 await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
                 WriteToDb dbWriter = scope.ServiceProvider.GetRequiredService<WriteToDb>();
+                RegionDbService regionDbService = scope.ServiceProvider.GetRequiredService<RegionDbService>();
 
                 // listings worden per groep opgeslagen, zodat niet elke listing een eigen databaseaanroep krijgt
                 List<ScrapedAccommodation> batch = new List<ScrapedAccommodation>();
@@ -187,7 +188,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                     // airbnb wordt handmatig gecontroleerd waarbij de coordinaten opgezocht worden in de localityboundary referentietabel 
                     else
                     {
-                        bool isDutchListing = await dbWriter.IsDutchListingAsync(listing.Latitude, listing.Longitude, ct);
+                        bool isDutchListing = await regionDbService.IsDutchListingAsync(listing.Latitude, listing.Longitude, ct);
                         if (!isDutchListing)
                         {
                             platformStats.ForeignListingsCount += 1;

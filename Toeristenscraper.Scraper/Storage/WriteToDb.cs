@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using NetTopologySuite.Geometries;
 using Toeristenscraper.Scraper.Reporting;
 using Toeristenscraper.Data;
 using Toeristenscraper.Data.Entities;
@@ -7,7 +6,7 @@ using Toeristenscraper.Scraper.Models;
 
 namespace Toeristenscraper.Scraper.Storage
 {
-    public class WriteToDb(ToeristenscraperDbContext db, ILogger<WriteToDb> logger)
+    public class WriteToDb(ToeristenscraperDbContext db, RegionDbService regionDbService, ILogger<WriteToDb> logger)
     {
         public const int BatchSize = 100;
         public async Task WriteBatchAsync(int platformId, DateOnly scrapingDate, IReadOnlyList<ScrapedAccommodation> batch, PlatformRunStats stats, CancellationToken ct)
@@ -108,14 +107,14 @@ namespace Toeristenscraper.Scraper.Storage
                     }
                 }
                 // woonplaats, gemeente en provincie bepalen met PostGIS (ST_Contains via NetTopologySuite). null wanneer er geen coördinaten zijn of het punt buiten Nederland ligt
-                LocalityBoundary? region = await LookupRegionAsync(item.Accommodation.Latitude, item.Accommodation.Longitude, ct);
-                AccommodationListing candidate = MapListing(item, platformId, region, establishment, scrapingDate);
+                LocalityBoundary? region = await regionDbService.LookupRegionAsync(item.Accommodation.Latitude, item.Accommodation.Longitude, ct);
+                AccommodationListing candidate = ListingMapper.MapListing(item, platformId, region, establishment, scrapingDate);
                
                 // laatst opgeslagen versie opzoeken, null als de listing nog niet in de database staat
                 AccommodationListing? latest = latestListings.GetValueOrDefault(candidate.SourceId);
 
                 AccommodationListing listing;
-                if (latest == null || HasListingChanged(latest, candidate))
+                if (latest == null || ListingMapper.HasListingChanged(latest, candidate))
                 {
                     db.AccommodationListing.Add(candidate);
                     listing = candidate;
@@ -253,92 +252,6 @@ namespace Toeristenscraper.Scraper.Storage
             stats.NewRoomAmenitiesCount += newRoomAmenities;
             stats.AvailabilityRowsCount += availabilityRows.Count;
             stats.ListingsWithAvailabilityCount += listingsWithAvailability;
-        }
-
-
-        private static AccommodationListing MapListing(ScrapedAccommodation item, int platformId, LocalityBoundary? region, AccommodationEstablishment? establishment, DateOnly scrapingDate)
-        {
-            DiscoveredAccommodation accommodation = item.Accommodation;
-            AccommodationDetails details = item.Details;
-
-            Point? coordinates = null;
-            if (accommodation.Latitude != null && accommodation.Longitude != null)
-            {
-                coordinates = new Point(accommodation.Longitude.Value, accommodation.Latitude.Value) { SRID = 4326 };
-            }
-
-
-            var accommodationListing = new AccommodationListing
-            {
-                PlatformId = platformId,
-                SourceId = accommodation.SourceId,
-                Title = accommodation.Title,
-                AccommodationType = details.AccommodationType ?? accommodation.AccommodationType,
-                Coordinates = coordinates,
-                IsExactLocation = details.IsExactLocation ?? accommodation.IsExactLocation,
-                City = region?.City,
-                Municipality = region?.Municipality,
-                Province = region?.Province,
-                Address = details.Address ?? accommodation.Address,  // exacte adres: niet altijd aanwezig, Airbnb toont het vooral bij accommodaties met een exacte locatie (zoals hotels), maar zelfs dan niet altijd.
-                StarClassification = accommodation.StarClassification,
-                Superhost = details.Superhost ?? accommodation.Superhost,
-                KVKNumber = details.KvkNumber,
-                AccommodationEstablishment = establishment,
-                URL = accommodation.URL,
-                ScrapingDate = scrapingDate
-            };
-            return accommodationListing;
-        }
-
-        // methode die de meest recent bestaande (in de database opgeslagen) versie van een listing te vergelijken met de versie die momenteel gescraped is. 
-        // als er een wijziging in data is, geeft deze method true terug en wordt de nieuwe versie opgeslagen
-        private static bool HasListingChanged(AccommodationListing latestExisting, AccommodationListing candidate)
-        {
-            if (candidate.Title != latestExisting.Title || candidate.AccommodationType != latestExisting.AccommodationType ||
-                !SameCoordinates(candidate.Coordinates, latestExisting.Coordinates) || candidate.IsExactLocation != latestExisting.IsExactLocation || candidate.Address != latestExisting.Address ||
-                candidate.StarClassification != latestExisting.StarClassification || candidate.Superhost != latestExisting.Superhost || candidate.URL != latestExisting.URL ||
-                candidate.KVKNumber != latestExisting.KVKNumber || candidate.AccommodationEstablishment?.AccommodationEstablishmentId != latestExisting.AccommodationEstablishmentId ||
-                candidate.City != latestExisting.City || candidate.Municipality != latestExisting.Municipality || candidate.Province != latestExisting.Province)
-            {
-                return true;
-            }
-            return false;
-        }
-
-        // != op twee Point-objecten vergelijkt referenties, daarom X en Y zelf vergelijken
-        private static bool SameCoordinates(Point? a, Point? b)
-        {
-            if (a == null || b == null)
-            {
-                return a == null && b == null;
-            }
-            return a.X == b.X && a.Y == b.Y;
-        }
-
-        // methode voor airbnb om te checken of een listing binnen Nederland ligt 
-        // hiervoor wordt de referentietabel LocalityBoundary gebruikt om de gebiedsindeling te bepalen voor elke listing 
-        public async Task<bool> IsDutchListingAsync(double? latitude, double? longitude, CancellationToken ct)
-        {
-            // de referentietabel bevat alleen data over Nederland. Elke listing die coordinaten buiten NL bevat, wordt als null teruggegeven hier
-            LocalityBoundary? region = await LookupRegionAsync(latitude, longitude, ct);
-            return region != null;
-        }
-
-        // woonplaats, gemeente en provincie bepalen met PostGIS (ST_Contains via NetTopologySuite).
-        // null wanneer er geen coördinaten zijn of het punt buiten Nederland ligt
-        private async Task<LocalityBoundary?> LookupRegionAsync(double? latitude, double? longitude, CancellationToken ct)
-        {
-            if (latitude == null || longitude == null)
-            {
-                return null;
-            }
-
-            Point point = new Point(longitude.Value, latitude.Value) { SRID = 4326 };
-
-            return await db.LocalityBoundary
-                .AsNoTracking() // ef core hoeft deze rijen niet bij te houden (read-only data)
-                .Where(w => w.Geom.Contains(point))
-                .FirstOrDefaultAsync(ct);
         }
     }
 }

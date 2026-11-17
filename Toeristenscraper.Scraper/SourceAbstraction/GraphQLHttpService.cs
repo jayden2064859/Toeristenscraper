@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using Toeristenscraper.Scraper.Exceptions;
 using Toeristenscraper.Scraper.Parsing.Shared;
