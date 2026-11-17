@@ -1,6 +1,7 @@
 using Azure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using Serilog;
 using System.Net.Http.Headers;
 using Toeristenscraper.Data;
@@ -125,34 +126,32 @@ try
 
 
     // per http-client de request delay + resilience strategy handlers toevoegen
+    // voor de request delay van elke httpClient wordt lambda gebruikt om een nieuwe handler te maken. Elke handler moet een nieuwe instantie zijn omdat DelegatingHandler (klasse waar RequestDelayHandler.cs van erft) dat vereist
     
     // Airbnb
     staysSearchClient.AddResilienceHandler("airbnb-staysearch", ResiliencePipelineSetup.Configure);
-    staysSearchClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
+    staysSearchClient.AddHttpMessageHandler(sp => new RequestDelayHandler(sp.GetRequiredService<IOptions<ScraperOptions>>().Value.Airbnb.RequestDelayMs));
 
     pdpAvailabilityCalendarClient.AddResilienceHandler("airbnb-availability", ResiliencePipelineSetup.Configure);
-    pdpAvailabilityCalendarClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
-
+    pdpAvailabilityCalendarClient.AddHttpMessageHandler(sp => new RequestDelayHandler(sp.GetRequiredService<IOptions<ScraperOptions>>().Value.Airbnb.RequestDelayMs));
 
     staysPdpSectionsClient.AddResilienceHandler("airbnb-stayspdpsections", ResiliencePipelineSetup.Configure);
-    staysPdpSectionsClient.AddHttpMessageHandler<AirbnbRequestDelayHandler>();
+    staysPdpSectionsClient.AddHttpMessageHandler(sp => new RequestDelayHandler(sp.GetRequiredService<IOptions<ScraperOptions>>().Value.Airbnb.RequestDelayMs));
 
     // Booking.com
     fullSearchClient.AddResilienceHandler("booking-fullsearch", ResiliencePipelineSetup.Configure);
-    fullSearchClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
+    fullSearchClient.AddHttpMessageHandler(sp => new RequestDelayHandler(sp.GetRequiredService<IOptions<ScraperOptions>>().Value.Booking.RequestDelayMs));
 
     availabilityCalendarClient.AddResilienceHandler("booking-availability", ResiliencePipelineSetup.Configure);
-    availabilityCalendarClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
+    availabilityCalendarClient.AddHttpMessageHandler(sp => new RequestDelayHandler(sp.GetRequiredService<IOptions<ScraperOptions>>().Value.Booking.RequestDelayMs));
 
     htmlClient.AddResilienceHandler("booking-html", ResiliencePipelineSetup.Configure);
-    htmlClient.AddHttpMessageHandler<BookingRequestDelayHandler>();
+    htmlClient.AddHttpMessageHandler(sp => new RequestDelayHandler(sp.GetRequiredService<IOptions<ScraperOptions>>().Value.Booking.RequestDelayMs));
 
 
     // transient services registreren (nieuwe instantie per request) 
     builder.Services.AddTransient<TileAlgorithm>();
     builder.Services.AddTransient<ScrapeOrchestrator>();
-    builder.Services.AddTransient<BookingRequestDelayHandler>();
-    builder.Services.AddTransient<AirbnbRequestDelayHandler>();
     builder.Services.AddTransient<IAccommodationSource, BookingSource>();
     builder.Services.AddTransient<IAccommodationSource, AirbnbSource>();
 
