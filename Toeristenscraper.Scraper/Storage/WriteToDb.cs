@@ -1,15 +1,54 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Toeristenscraper.Scraper.Reporting;
 using Toeristenscraper.Data;
 using Toeristenscraper.Data.Entities;
 using Toeristenscraper.Scraper.Models;
+using Toeristenscraper.Scraper.Orchestration;
+using Toeristenscraper.Scraper.Reporting;
 
 namespace Toeristenscraper.Scraper.Storage
 {
     public class WriteToDb(ToeristenscraperDbContext db, RegionDbService regionDbService, ILogger<WriteToDb> logger)
     {
         public const int BatchSize = 100;
-        public async Task WriteBatchAsync(int platformId, DateOnly scrapingDate, IReadOnlyList<ScrapedAccommodation> batch, PlatformRunStats stats, CancellationToken ct)
+
+        // zorgt ervoor dat platforms niet tegelijk naar de database schrijven (voorkomt dubbele inserts in de db).
+        // static, omdat elk platform een eigen WriteToDb-instantie heeft (eigen scope), maar het slot gedeeld moet worden
+        private static readonly SemaphoreSlim dbWriteLock = new SemaphoreSlim(1, 1);
+
+        // slaat een batch op en geeft het aantal mislukte listings terug. bij een onbereikbare database wordt de fout doorgegeven (platform stopt),
+        // bij een andere fout wordt alleen deze batch overgeslagen
+        public async Task<int> SaveBatchAsync(int platformId, string platformName, DateOnly scrapingDate, List<ScrapedAccommodation> batch, PlatformRunStats stats, CancellationToken ct)
+        {
+            int failed = 0;
+            await dbWriteLock.WaitAsync(ct);
+            try
+            {
+                await WriteBatchAsync(platformId, scrapingDate, batch, stats, ct);
+                stats.ProcessedListingsCount += batch.Count;
+                if (batch.Count > 0)
+                {
+                    logger.LogInformation("{Platform}: {ProcessedListingsCount}/{UniqueListingsCount} listings processed.", platformName, stats.ProcessedListingsCount, stats.UniqueListingsCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ScrapeErrorClassifier.IsDatabaseUnavailable(ex))
+                {
+                    throw;
+                }
+                logger.LogError(ex, "Batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, platformName, ex.InnerException?.Message ?? ex.Message);
+                failed = batch.Count;
+            }
+            finally
+            {
+                dbWriteLock.Release();
+            }
+            batch.Clear();
+            return failed;
+        }
+
+        // methode die de gehele logica voor het opslaan van een listing-batch uitvoert 
+        private async Task WriteBatchAsync(int platformId, DateOnly scrapingDate, IReadOnlyList<ScrapedAccommodation> batch, PlatformRunStats stats, CancellationToken ct)
         {
             if (batch.Count == 0)
             {

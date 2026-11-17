@@ -14,8 +14,6 @@ namespace Toeristenscraper.Scraper.Orchestration
     // bepaalt wat er tijdens een scrape-run gebeurt
     public class ScrapeOrchestrator(IEnumerable<IAccommodationSource> sources, TileAlgorithm tileAlgorithm, IOptions<ScraperOptions> options, ILogger<ScrapeOrchestrator> logger, IServiceScopeFactory scopeFactory)
     {
-        // zorgt ervoor dat platforms niet tegelijk naar de database schrijven (voorkomt dubbele inserts in de db)
-        private readonly SemaphoreSlim dbWriteLock = new SemaphoreSlim(1, 1);
         public async Task RunAsync(CancellationToken ct)
         {
 
@@ -41,8 +39,10 @@ namespace Toeristenscraper.Scraper.Orchestration
             logger.LogInformation("Resilience: max retries {MaxRetries} (initial delay {RetryDelaySeconds}s, exponential backoff), cooldown of {CooldownMinutes} min after {MaxConsecutiveFailures} consecutive failed listings, platform stops after {MaxCooldowns} cooldowns without success",
                 options.Value.Resilience.MaxRetries, options.Value.Resilience.RetryDelaySeconds,
                 options.Value.Resilience.CooldownMinutes, options.Value.Resilience.MaxConsecutiveFailures, options.Value.Resilience.MaxCooldowns);
+            
             // lijst van tasks aanmaken die uitgevoerd moeten worden in een run (scrape-runs van alle bestaande platforms)
             List<Task> tasks = new List<Task>();
+            
             foreach (IAccommodationSource source in sources)
             {
                 PlatformRunStats platformStats = new PlatformRunStats { PlatformName = source.PlatformName, AreaCount = options.Value.Areas.Count };
@@ -60,36 +60,6 @@ namespace Toeristenscraper.Scraper.Orchestration
         }
 
 
-        // helper method die de WriteBatchAsync methode aanroept om een batch op te slaan naar de database. de helper method geeft het aantal mislukte weggeschreven listings terug
-        private async Task<int> SaveBatchAsync(WriteToDb dbWriter, IAccommodationSource source, DateOnly scrapingDate, List<ScrapedAccommodation> batch, PlatformRunStats platformStats, CancellationToken ct)
-        {
-            int failed = 0;
-            await dbWriteLock.WaitAsync(ct);
-            try
-            {
-                await dbWriter.WriteBatchAsync(source.PlatformId, scrapingDate, batch, platformStats, ct);
-                platformStats.ProcessedListingsCount += batch.Count;
-                if (batch.Count > 0)
-                {
-                    logger.LogInformation("{Platform}: {ProcessedListingsCount}/{UniqueListingsCount} listings processed.", source.PlatformName, platformStats.ProcessedListingsCount, platformStats.UniqueListingsCount);
-                }
-            }
-            catch (Exception ex)
-            {
-                if (ScrapeErrorClassifier.IsDatabaseUnavailable(ex))
-                {
-                    throw;
-                }
-                logger.LogError(ex, "Batch of {Count} listings on {Platform} not saved: {Error}", batch.Count, source.PlatformName, ex.InnerException?.Message ?? ex.Message);
-                failed = batch.Count;
-            }
-            finally
-            {
-                dbWriteLock.Release();
-            }
-            batch.Clear();
-            return failed;
-        }
 
         // methode die alles uitvoert wat een platform tijdens een scrape-run moet doen
         // aparte methode gemaakt zodat het toegevoegd kan worden aan een lijst van Tasks (voor concurrent scraping)
@@ -122,8 +92,10 @@ namespace Toeristenscraper.Scraper.Orchestration
                 {
                     // method uit TileAlgorithm.cs aanroepen die de discovery (inclusief tegelsplitsing) van accommodaties uitvoert
                     var (accommodations, areaFailedTiles) = await tileAlgorithm.DiscoverAsync(source, area, source.MaxDepth, ct);
+                    
                     // resultaten per gebied worden toegevoegd aan de platformresults lijst
                     platformResults.AddRange(accommodations);
+                   
                     // aantal opgehaalde listings per scrape-gebied opslaan zodat het gelogd kan worden tijdens de platform-run
                     platformStats.ListingsPerArea.Add(area.Name + ": " + accommodations.Count);
 
@@ -186,7 +158,7 @@ namespace Toeristenscraper.Scraper.Orchestration
 
                         if (batch.Count == WriteToDb.BatchSize)
                         {
-                            platformStats.FailedListingsCount += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
+                            platformStats.FailedListingsCount += await dbWriter.SaveBatchAsync(source.PlatformId, source.PlatformName, scrapingDate, batch, platformStats, ct);
                         }
                     }
                     catch (Exception ex)
@@ -210,7 +182,7 @@ namespace Toeristenscraper.Scraper.Orchestration
                     }
                 }
                 // laatste batch wegschrijven. het return type van SaveBatchAsync is het aantal gefaalde listings voor het platform waarvoor weggeschreven wordt
-                platformStats.FailedListingsCount += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
+                platformStats.FailedListingsCount += await dbWriter.SaveBatchAsync(source.PlatformId, source.PlatformName, scrapingDate, batch, platformStats, ct);
 
             }
             catch (BrokenCircuitException)  // loggen wanneer circuit geopent is (run gestopt for specifiek platform)

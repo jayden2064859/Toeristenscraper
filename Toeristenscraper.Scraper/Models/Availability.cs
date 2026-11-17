@@ -4,6 +4,7 @@ using System.Text;
 
 namespace Toeristenscraper.Scraper.Models
 {
+    // class die geinstantieerd wordt voor elke beschikbaarheidsdag in de AvailabilityCalendar API-operaties voor beide platforms
     public class Availability
     {
         public bool? IsAvailable { get; set; }
