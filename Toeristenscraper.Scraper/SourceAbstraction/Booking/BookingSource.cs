@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Options;
 using System.Text.Json;
+using Toeristenscraper.Scraper.Configuration;
+using Toeristenscraper.Scraper.Models;
 using Toeristenscraper.Scraper.Parsing.Booking;
 using Toeristenscraper.Scraper.Reporting;
-using Toeristenscraper.Scraper.Models;
 using Toeristenscraper.Scraper.SourceAbstraction.Booking.HttpServices;
-using Toeristenscraper.Scraper.Configuration;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 {
@@ -122,8 +122,8 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking
 
             string pageName = listing.DetailParameters["pageName"];
 
-            using JsonDocument doc = await html.GetPageAsync(pageName, checkIn, checkOut, ct);
-            return HTMLParser.Parse(doc, checkIn, checkOut, search.Adults, search.Children, search.Pets);
+            string htmlPage = await html.GetPageAsync(pageName, checkIn, checkOut, ct);
+            return HTMLParser.Parse(htmlPage, pageName, checkIn, checkOut, search.Adults, search.Children, search.Pets);
         }
     }
 }

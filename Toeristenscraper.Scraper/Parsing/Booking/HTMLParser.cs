@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using HtmlAgilityPack;
+using System.Text.Json;
+using Toeristenscraper.Scraper.Exceptions;
 using Toeristenscraper.Scraper.Models;
 using Toeristenscraper.Scraper.Parsing.Shared;
 
@@ -12,8 +14,9 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
         private record PriceInfo(decimal? TotalPrice, bool? TaxIncluded, decimal? TaxAmount);
         private record BedInfo(int? BedCount, string? BedType);
 
-        public static AccommodationDetails Parse(JsonDocument doc, DateOnly checkIn, DateOnly checkOut, int adults, int children, int pets)
+        public static AccommodationDetails Parse(string html, string pageName, DateOnly checkIn, DateOnly checkOut, int adults, int children, int pets)
         {
+            using JsonDocument doc = ExtractApolloData(html, pageName);
             JsonElement root = doc.RootElement;
 
             JsonElement rootQuery = GetJsonElementHelper.Get(root, "ROOT_QUERY")
@@ -87,6 +90,26 @@ namespace Toeristenscraper.Scraper.Parsing.Booking
                 ChildCount = children,
                 PetCount = pets
             };
+        }
+
+        // methode die het Apollo script uit de opgehaalde property page (HTML) haalt. Dit Apollo script bevat alle benodigde data voor de parser (en het datamodel) 
+        private static JsonDocument ExtractApolloData(string html, string pageName)
+        {
+            HtmlDocument htmlDoc = new HtmlDocument();
+            htmlDoc.LoadHtml(html);
+
+            HtmlNode? apolloNode = htmlDoc.DocumentNode.SelectSingleNode("//script[@data-capla-store-data='apollo']");
+            if (apolloNode == null)
+            {
+                // geen challenge, maar ook geen Apollo-data: andere pagina of gewijzigde opbouw, alleen deze listing wordt overgeslagen
+                throw new InvalidOperationException("Booking.com: Apollo data not found on property page " + pageName);
+            }
+            // booking.com negeert de zoekparameters als de request als robot wordt gezien, de pagina bevat dan geen prijzen
+            if (apolloNode.InnerHtml.Contains("\\\"isRobot\\\":true"))
+            {
+                throw new BlockedException("Booking.com: request treated as robot, page contains no prices for " + pageName);
+            }
+            return JsonDocument.Parse(apolloNode.InnerHtml);
         }
 
         // bedden van een kamer, bijv. "1 DOUBLE_BED, 1 SOFA_BED"

@@ -6,11 +6,10 @@ using System.Text.Json;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
 {
-    public class PdpAvailabilityCalendar(HttpClient httpClient)
+    public class PdpAvailabilityCalendar(HttpClient httpClient) : GraphQLHttpService(httpClient, "api/v3")
     {
         public const int maxAmountOfMonths = 12; // maximaal 12 kalendermaanden toegestaan 
-        private static readonly string BodyTemplate = File.ReadAllText(
-        Path.Combine(AppContext.BaseDirectory, "SourceAbstraction", "Airbnb", "Queries", "PdpAvailabilityCalendar.json"));
+        private static readonly string BodyTemplate = LoadTemplate("Airbnb", "PdpAvailabilityCalendar.json");
 
         public async Task<JsonDocument> GetPageAsync(string sourceId, int month, int year, CancellationToken ct)
         {
@@ -20,13 +19,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
                 .Replace("{{month}}", month.ToString())
                 .Replace("{{year}}", year.ToString());
 
-
-            using var content = new StringContent(body, Encoding.UTF8, "application/json");
-            using var response = await httpClient.PostAsync("api/v3", content, ct);
-            response.EnsureSuccessStatusCode();
-
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            return await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            return await PostAsync(body, ct);
         }
     }
 }

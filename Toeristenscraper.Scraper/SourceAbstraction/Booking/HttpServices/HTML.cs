@@ -1,7 +1,5 @@
-﻿using HtmlAgilityPack;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using System.Net;
-using System.Text.Json;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Exceptions;
 using Toeristenscraper.Scraper.Transport;
@@ -11,7 +9,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.HttpServices
     // HTML van accommodatiepagina's worden opgehaald om voorzieningen en kamergerelateerde data per listing op te halen
     public class HTML(HttpClient httpClient, IOptions<ScraperOptions> options, BookingCookieProvider cookieProvider)
     {
-        public async Task<JsonDocument> GetPageAsync(string pageName, DateOnly checkIn, DateOnly checkOut, CancellationToken ct)
+        public async Task<string> GetPageAsync(string pageName, DateOnly checkIn, DateOnly checkOut, CancellationToken ct)
         {
             // leeftijden van kinderen worden niet in het datamodel opgeslagen. Daarnaast is het uitwerken van zoekparameters incl kinderen geen eis van de productowner,
             // dus de keuze is gemaakt om dit niet uit te werken, zodat er geen data zonder herleidbaarheid in de database terecht kan komen
@@ -46,23 +44,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Booking.HttpServices
                     throw new BlockedException("Booking.com: challenge page (HTTP 202) returned after refreshing aws-waf-token");
                 }
             }
-
-            // het Apollo-script (JSON) uit de HTML halen, hierin staat alle data die geparsed wordt
-            HtmlDocument htmlDoc = new HtmlDocument();
-            htmlDoc.LoadHtml(html);
-
-            HtmlNode? apolloNode = htmlDoc.DocumentNode.SelectSingleNode("//script[@data-capla-store-data='apollo']");
-            if (apolloNode == null)
-            {
-                // geen challenge, maar ook geen Apollo-data: andere pagina of gewijzigde opbouw, alleen deze listing wordt overgeslagen
-                throw new InvalidOperationException("Booking.com: Apollo data not found on property page " + pageName);
-            }
-            // booking.com negeert de zoekparameters als de request als robot wordt gezien, de pagina bevat dan geen prijzen
-            if (apolloNode.InnerHtml.Contains("\\\"isRobot\\\":true"))
-            {
-                throw new BlockedException("Booking.com: request treated as robot, page contains no prices for " + pageName);
-            }
-            return JsonDocument.Parse(apolloNode.InnerHtml);
+            return html;
         }
 
         private async Task<string?> SendAsync(string url, CancellationToken ct)

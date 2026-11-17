@@ -8,10 +8,10 @@ using Toeristenscraper.Scraper.Transport;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
 {
-    public class StaysPdpSections(HttpClient httpClient, IOptions<ScraperOptions> options, AirbnbHashProvider hashProvider) 
+    public class StaysPdpSections(HttpClient httpClient, IOptions<ScraperOptions> options, AirbnbHashProvider hashProvider) : GraphQLHttpService(httpClient, "api/v3")
     {
-        private static readonly string BodyTemplate = File.ReadAllText(
-        Path.Combine(AppContext.BaseDirectory, "SourceAbstraction", "Airbnb", "Queries", "StaysPdpSections.json"));
+        private static readonly string BodyTemplate = LoadTemplate("Airbnb", "StaysPdpSections.json");
+
         public async Task<JsonDocument> GetPageAsync(string sourceId, DateOnly checkIn, DateOnly checkOut, CancellationToken ct)
         {
             // verplichte graphql variabelen (request-body fields) die meegegeven moeten worden 
@@ -35,9 +35,9 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
                 .Replace("{{childrenCount}}", search.Children.ToString())
                 .Replace("{{petCount}}", search.Pets.ToString());
 
-            // request versturen
-            using var content = new StringContent(body, Encoding.UTF8, "application/json");
-            using var response = await httpClient.PostAsync("api/v3", content, ct);
+            // request versturen (via de basisklasse). de response wordt nog niet uitgelezen, omdat eerst op een verlopen hash gecontroleerd moet worden\
+            // in plaats van PostAsync van de basisklasse te gebruiken (die SendAsync en ReadJsonAsync in 1 methode uitvoert), wordt hier tussendoor eerst een check op de persisted query hash gedaan
+            using HttpResponseMessage response = await SendAsync(body, ct);
 
             // de api operatie geeft response 400 'persisted_query_not_found' terug wanneer de meegegeven hash in de request body verlopen is
             if (response.StatusCode == HttpStatusCode.BadRequest)
@@ -49,11 +49,9 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
                     return await GetPageAsync(sourceId, checkIn, checkOut, ct);
                 }
             }
-            response.EnsureSuccessStatusCode();
 
-            // opgehaalde response returnen
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            return await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            // statuscode controleren, response uitlezen als JSON en controleren op GraphQL-fouten (in de basisklasse)
+            return await ReadJsonAsync(response, ct);
         }
     }
 }

@@ -7,13 +7,12 @@ using Toeristenscraper.Scraper.Models;
 
 namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
 {
-    public class StaysSearch(HttpClient httpClient)
+    public class StaysSearch(HttpClient httpClient) : GraphQLHttpService(httpClient, "api/v3")
     {
         public const int PageSize = 18; // max 18 listings per response payload
         public const int MaxPageCursors = 15; // max 15 page cursors per response (15x18 listings)
 
-        private static readonly string BodyTemplate = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "SourceAbstraction", "Airbnb", "Queries", "StaysSearch.json"));
+        private static readonly string BodyTemplate = LoadTemplate("AIrbnb", "StaysSearch.json");
 
         public async Task<JsonDocument> GetPageAsync(Tile tile, string? cursor, CancellationToken ct)
         {
@@ -31,12 +30,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
                 .Replace("{{swLng}}", tile.SwLng.ToString(CultureInfo.InvariantCulture))
                 .Replace("{{cursor}}", cursorJson);
 
-            using var content = new StringContent(body, Encoding.UTF8, "application/json");
-            using var response = await httpClient.PostAsync("api/v3", content, ct);
-            response.EnsureSuccessStatusCode();
-
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
-            return await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            return await PostAsync(body, ct);
         }
     }
 }
