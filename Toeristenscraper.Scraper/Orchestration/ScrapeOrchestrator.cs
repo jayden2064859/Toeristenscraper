@@ -1,12 +1,9 @@
 ﻿using Microsoft.Extensions.Options;
-using Npgsql;
 using Polly.CircuitBreaker;
 using System.Diagnostics;
-using System.Net;
 using System.Reflection;
 using Toeristenscraper.Scraper.Configuration;
 using Toeristenscraper.Scraper.Discovery;
-using Toeristenscraper.Scraper.Exceptions;
 using Toeristenscraper.Scraper.Models;
 using Toeristenscraper.Scraper.Reporting;
 using Toeristenscraper.Scraper.SourceAbstraction;
@@ -76,11 +73,10 @@ namespace Toeristenscraper.Scraper.Orchestration
                 {
                     logger.LogInformation("{Platform}: {ProcessedListingsCount}/{UniqueListingsCount} listings processed.", source.PlatformName, platformStats.ProcessedListingsCount, platformStats.UniqueListingsCount);
                 }
-
             }
             catch (Exception ex)
             {
-                if (IsDatabaseUnavailable(ex))
+                if (ScrapeErrorClassifier.IsDatabaseUnavailable(ex))
                 {
                     throw;
                 }
@@ -93,27 +89,6 @@ namespace Toeristenscraper.Scraper.Orchestration
             }
             batch.Clear();
             return failed;
-        }
-
-        // helper method die controleert of een fout (of een inner exception) wordt veroorzaakt door een onbereikbare database
-        private static bool IsDatabaseUnavailable(Exception ex)
-        {
-            Exception? current = ex;
-            while (current != null)
-            {
-                // transiente (tijdelijke) fouten
-                if (current is NpgsqlException npgsqlException && npgsqlException.IsTransient)
-                {
-                    return true;
-                }
-                // niet-transiente fouten (bijv verkeerd wachtwoord, 28P01) wordt ook opgevangen
-                if (current is PostgresException postgresException && postgresException.SqlState.StartsWith("28"))
-                {
-                    return true;
-                }
-                current = current.InnerException;
-            }
-            return false;
         }
 
         // methode die alles uitvoert wat een platform tijdens een scrape-run moet doen
@@ -168,10 +143,8 @@ namespace Toeristenscraper.Scraper.Orchestration
                 logger.LogInformation("{Platform}: discovery completed, {Found} found ({ListingsPerArea}), {Unique} unique",
                                         source.PlatformName, platformStats.FoundListingsCount, string.Join(", ", platformStats.ListingsPerArea), platformStats.UniqueListingsCount);
 
-                // aantal listings dat achter elkaar mislukt is. bij MaxConsecutiveFailures volgt een cooldown
-                int consecutiveFailures = 0;
-                // aantal cooldowns achter elkaar zonder dat er tussendoor een listing gelukt is. bij MaxCooldowns stopt het platform
-                int cooldownsWithoutSuccess = 0;
+                // houdt de mislukte listings en cooldowns van dit platform bij ('new' i.p.v. een DI omdat de cooldown tellers per platform apart moeten blijven, geen shared state)
+                CooldownTracker cooldown = new CooldownTracker(options.Value.Resilience, platformStats, logger);
 
                 // detailoperaties per listing: een mislukte listing wordt overgeslagen, zodat de rest van de run doorgaat 
                 foreach (DiscoveredAccommodation listing in deduplicatedList)
@@ -204,11 +177,10 @@ namespace Toeristenscraper.Scraper.Orchestration
                         AccommodationDetails details = await source.GetDetailsAsync(listing, availabilityDays, ct);
 
                         // alle gescrapete fields controleren of ze nog werken naar behoren
-                        CountRetrievedFields(platformStats, listing, details, availabilityDays);
-
+                        platformStats.CountRetrievedFields(listing, details, availabilityDays);
+                        
                         // alle requests voor deze listing zijn gelukt. tellers voor de foutafhandeling resetten
-                        consecutiveFailures = 0;
-                        cooldownsWithoutSuccess = 0;
+                        cooldown.ResetCounters();
 
                         batch.Add(new ScrapedAccommodation { Accommodation = listing, Availability = availabilityDays, Details = details });
 
@@ -217,56 +189,24 @@ namespace Toeristenscraper.Scraper.Orchestration
                             platformStats.FailedListingsCount += await SaveBatchAsync(dbWriter, source, scrapingDate, batch, platformStats, ct);
                         }
                     }
-                    catch (BrokenCircuitException)
-                    {
-                        throw;
-                    }
                     catch (Exception ex)
                     {
-                        if (ex is HttpRequestException httpException && httpException.StatusCode == HttpStatusCode.NotFound)
+                        if (ScrapeErrorClassifier.StopsPlatform(ex)) // bevat alle verwachte fouten waarbij een platform-run bewust gestopt moet worden 
                         {
-                            throw; // platform stopt met scrapen bij een 404 (not found)
+                            throw; 
                         }
-                        if (ex is OutdatedHashException || ex is BlockedException)
-                        {
-                            throw;
-                        }
-                        if (IsDatabaseUnavailable(ex)) // database wordt 5x opnieuw geprobeerd (config in program.cs) daarna stopt het platform met scrapen
-                        {
-                            throw;
-                        }
-                        if (ex is HttpRequestException || ex is GraphQLErrorException)
+                        if (ScrapeErrorClassifier.IsExpectedListingError(ex)) // bevat een lijst van alle verwachte fouten waarbij geen stacktrace nodig is
                         {
                             logger.LogWarning("Listing {SourceId} on {Platform} skipped: {Error}", listing.SourceId, source.PlatformName, ex.Message);
                         }
-                        else
+                        else // onverwachte fouten waarbij de stacktrace handig is
                         {
                             logger.LogWarning(ex, "Listing {SourceId} on {Platform} skipped (unexpected error)", listing.SourceId, source.PlatformName);
                         }
                         platformStats.FailedListingsCount += 1;
-                        consecutiveFailures += 1;
-
-                        // wordt uitgevoerd wanneer MaxConsecutiveFailures listings achter elkaar mislukt zijn (initial request + 3 retries): cooldown, of stoppen als er al MaxCooldowns cooldowns zonder succes zijn geweest
-                        if (consecutiveFailures >= options.Value.Resilience.MaxConsecutiveFailures)
-                        {
-                            // nog niet alle cooldowns achter elkaar gebruikt: platform pauzeert een ingesteld aantal minuten en gaat daarna verder met de volgende listing
-                            if (cooldownsWithoutSuccess < options.Value.Resilience.MaxCooldowns)
-                            {
-                                cooldownsWithoutSuccess += 1;
-                                platformStats.CooldownCount += 1;
-
-                                logger.LogWarning("{Platform}: {Failures} consecutive failed listings, pausing {Minutes} minutes (cooldown {Count}/{Max} without success)",
-                                    source.PlatformName, consecutiveFailures, options.Value.Resilience.CooldownMinutes, cooldownsWithoutSuccess, options.Value.Resilience.MaxCooldowns);
-
-                                await Task.Delay(TimeSpan.FromMinutes(options.Value.Resilience.CooldownMinutes), ct);
-                                consecutiveFailures = 0;
-                            }
-                            // alle cooldowns achter elkaar gebruikt zonder één gelukte listing: platform stopt
-                            else
-                            {
-                                throw new MaxConsecutiveFailuresException("No successful listing after " + options.Value.Resilience.MaxCooldowns + " consecutive cooldowns");
-                            }
-                        }                   
+                        
+                        // mislukte listing registreren (na MaxConsecutiveFailures volgt een cooldown, en na MaxCooldowns stopt een platform-run)
+                        await cooldown.RegisterFailureAsync(ct);
                     }
                 }
                 // laatste batch wegschrijven. het return type van SaveBatchAsync is het aantal gefaalde listings voor het platform waarvoor weggeschreven wordt
@@ -282,8 +222,8 @@ namespace Toeristenscraper.Scraper.Orchestration
             {
                 platformStats.StopReason = ex.GetType().Name; // ex.Message kan ook als de error logging concreter moet
 
-                // verwachte fouten: melding is genoeg, geen stacktrace nodig
-                if (IsDatabaseUnavailable(ex) || ex is BlockedException || ex is OutdatedHashException || ex is HttpRequestException || ex is MaxConsecutiveFailuresException)
+                // verwachte fouten worden opgevangen in ScrapeErrorClassifier, geen stacktrace nodig
+                if (ScrapeErrorClassifier.IsExpectedPlatformError(ex))
                 {
                     logger.LogError("Scrape-run {RunId}: {Platform} stopped: {Error}", runId, source.PlatformName, ex.Message);
                 }
@@ -298,25 +238,6 @@ namespace Toeristenscraper.Scraper.Orchestration
             platformStats.CheckFieldFillRates(logger, source.MonitoredFields);
             platformStats.LogSummary(logger, scrapingDate);
 
-        }
-
-        // methode om te controleren welke waarde voor elke field is opgehaald.
-        // als alle listings waarde null hebben teruggekregen voor de specifieke field, wordt er een warning gelogged
-        private void CountRetrievedFields(PlatformRunStats platformStats, DiscoveredAccommodation listing, AccommodationDetails details, IReadOnlyList<Availability> availabilityDays)
-        {
-            platformStats.CheckedListingsCount += 1;
-            platformStats.CountField(MonitoredField.Title, listing.Title != null);
-            platformStats.CountField(MonitoredField.Coordinates, listing.Latitude != null);
-            platformStats.CountField(MonitoredField.AccommodationType, (details.AccommodationType ?? listing.AccommodationType) != null);
-            platformStats.CountField(MonitoredField.Availability, availabilityDays.Count > 0);
-            platformStats.CountField(MonitoredField.Rooms, details.Rooms.Count > 0);
-            platformStats.CountField(MonitoredField.TotalPrice, details.Rooms.Any(r => r.TotalPrice != null));
-            platformStats.CountField(MonitoredField.Amenities, details.Amenities.Count > 0);
-            platformStats.CountField(MonitoredField.ReviewCount, (details.ReviewCount ?? listing.ReviewCount) != null);
-            platformStats.CountField(MonitoredField.KvkNumber, details.KvkNumber != null);
-            platformStats.CountField(MonitoredField.RegistrationNumber, details.RegistrationNumber != null);
-            platformStats.CountField(MonitoredField.StarClassification, listing.StarClassification != null);
-            platformStats.CountField(MonitoredField.Superhost, (details.Superhost ?? listing.Superhost) != null);
         }
     }
 }

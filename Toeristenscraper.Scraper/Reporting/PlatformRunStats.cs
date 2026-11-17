@@ -1,4 +1,6 @@
-﻿namespace Toeristenscraper.Scraper.Reporting
+﻿using Toeristenscraper.Scraper.Models;
+
+namespace Toeristenscraper.Scraper.Reporting
 {
     // class met properties die de scrape-run stats van een individueel platform bevat
     public class PlatformRunStats
@@ -126,17 +128,17 @@
         {
             if (!FilledFieldCounts.ContainsKey(field))
             {
-                FilledFieldCounts[field] = 0;
+                FilledFieldCounts[field] = 0; // 0 toevoegen aan de teller als er geen waarde is gevonden 
             }
             if (hasValue)
             {
-                FilledFieldCounts[field] += 1;
+                FilledFieldCounts[field] += 1; // 1 toevoegen aan de teller als er wel een waarde is gevonden
             }
         }
 
         public void CheckFieldFillRates(ILogger logger, IReadOnlyList<MonitoredField> monitoredFields)
         {
-            if (CheckedListingsCount < 100)
+            if (CheckedListingsCount < 100) // zodra 100 listings zijn gecontroleerd, wordt voor elk doorlopen field gekeken hoe hoog de teller is. Als voor 100 listings de teller nog steeds op 0 is, wordt een warning gelogged dat de field mogelijk veranderd is
             {
                 return; // te weinig listings voor een betrouwbare controle
             }
@@ -149,7 +151,25 @@
                         PlatformName, field, CheckedListingsCount);
                 }
             }
+        }
 
+        // methode om te controleren welke waarde voor elke field is opgehaald.
+        // als alle listings waarde null hebben teruggekregen voor de specifieke field, wordt er een warning gelogged
+        public void CountRetrievedFields(DiscoveredAccommodation listing, AccommodationDetails details, IReadOnlyList<Availability> availabilityDays)
+        {
+            CheckedListingsCount += 1;
+            CountField(MonitoredField.Title, listing.Title != null);
+            CountField(MonitoredField.Coordinates, listing.Latitude != null);
+            CountField(MonitoredField.AccommodationType, (details.AccommodationType ?? listing.AccommodationType) != null);
+            CountField(MonitoredField.Availability, availabilityDays.Count > 0);
+            CountField(MonitoredField.Rooms, details.Rooms.Count > 0);
+            CountField(MonitoredField.TotalPrice, details.Rooms.Any(r => r.TotalPrice != null));
+            CountField(MonitoredField.Amenities, details.Amenities.Count > 0);
+            CountField(MonitoredField.ReviewCount, (details.ReviewCount ?? listing.ReviewCount) != null);
+            CountField(MonitoredField.KvkNumber, details.KvkNumber != null);
+            CountField(MonitoredField.RegistrationNumber, details.RegistrationNumber != null);
+            CountField(MonitoredField.StarClassification, listing.StarClassification != null);
+            CountField(MonitoredField.Superhost, (details.Superhost ?? listing.Superhost) != null);
         }
     }
 }

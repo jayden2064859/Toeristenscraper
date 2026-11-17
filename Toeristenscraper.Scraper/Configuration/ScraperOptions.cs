@@ -15,6 +15,13 @@
         public SearchParameterOptions SearchParameters { get; set; } = new SearchParameterOptions();
     }
 
+    // aparte inheriting class voor AirbnbOptions, omdat airbnb een persisted query hash en api key vereist voor de requests. booking.com heeft in de huidige opzet geen extra eigen instellingen nodig, dus heeft momenteel geen eigen inheriting class
+    public class AirbnbOptions : PlatformOptions
+    {
+        public string ApiKey { get; set; } = string.Empty; // elke Airbnb operatie vereist de (publieke) API-key
+        public string StaysPdpSectionsHash { get; set; } = string.Empty; // persisted query hash nodig voor StaysPdpSections operatie
+    }
+
     // een gebied met de bounding box 
     public class ScrapeArea
     {
