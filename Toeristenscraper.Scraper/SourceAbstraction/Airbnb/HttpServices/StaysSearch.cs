@@ -12,7 +12,7 @@ namespace Toeristenscraper.Scraper.SourceAbstraction.Airbnb.HttpServices
         public const int PageSize = 18; // max 18 listings per response payload
         public const int MaxPageCursors = 15; // max 15 page cursors per response (15x18 listings)
 
-        private static readonly string BodyTemplate = LoadTemplate("AIrbnb", "StaysSearch.json");
+        private static readonly string BodyTemplate = LoadTemplate("Airbnb", "StaysSearch.json");
 
         public async Task<JsonDocument> GetPageAsync(Tile tile, string? cursor, CancellationToken ct)
         {
